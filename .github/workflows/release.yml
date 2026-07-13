@@ -30,14 +30,12 @@ jobs:
       # keep the web bundle in sync before publishing
       - run: npm run build:web
 
-      # bump create-packkit and mirror the version into the packkit alias
       - name: Bump version
         id: bump
         run: |
           npm version ${{ inputs.bump }} --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          node -e "const f='alias/packkit/package.json',p=require('./'+f);p.version='$VERSION';p.dependencies['create-packkit']='$VERSION';require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
 
       - name: Commit and tag
         run: |
@@ -49,12 +47,6 @@ jobs:
           git push --follow-tags
 
       - name: Publish create-packkit
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish packkit alias
-        working-directory: alias/packkit
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

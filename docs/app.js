@@ -86,7 +86,7 @@ function update() {
 
 function commandFor(cfg) {
   const d = defaultConfig();
-  const parts = ['npx packkit', cfg.name || 'my-package'];
+  const parts = ['npx create-packkit', cfg.name || 'my-package'];
   const flag = (k, f) => { if (JSON.stringify(cfg[k]) !== JSON.stringify(d[k])) parts.push(`--${f} ${Array.isArray(cfg[k]) ? cfg[k].join(',') : cfg[k]}`); };
   flag('language', 'language'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
   flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release');

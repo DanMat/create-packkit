@@ -13,20 +13,20 @@ Most scaffolders lock you into one stack, one language, and the terminal. Packki
 ```sh
 # interactive wizard
 npm create packkit@latest
-# or the short alias
-npx packkit
+# or with npx
+npx create-packkit
 
 # skip the wizard with a preset
-npx packkit ts-lib my-lib
-npx packkit cli my-tool
-npx packkit --preset full my-pkg --pm pnpm
+npx create-packkit ts-lib my-lib
+npx create-packkit cli my-tool
+npx create-packkit --preset full my-pkg --pm pnpm
 ```
 
 Then `cd`, and you already have a working project — `build`, `test`, and `lint` all pass out of the box.
 
 ## Or configure it on the web
 
-No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx packkit` command). Everything runs in your browser.
+No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx create-packkit` command). Everything runs in your browser.
 
 ## What you can pick
 
