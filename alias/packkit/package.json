@@ -1,6 +1,6 @@
 {
   "name": "packkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Short alias for create-packkit — scaffold a modern npm package or CLI (npx packkit).",
   "type": "module",
   "bin": {
@@ -30,6 +30,6 @@
   "license": "MIT",
   "homepage": "https://danmat.github.io/create-packkit/",
   "dependencies": {
-    "create-packkit": "^0.1.0"
+    "create-packkit": "0.1.1"
   }
 }
