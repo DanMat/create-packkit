@@ -33,9 +33,14 @@ Options:
   --no-install        Skip dependency install
   --no-git            Skip git init
   --pm <manager>      npm | pnpm | yarn | bun
-  --language <ts|js>  --module <esm|cjs|dual>  --bundler <tsup|tsdown|unbuild|rollup|none>
+  --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react>
+  --target <library|cli|service>   (repeatable)
+  --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
   --test <vitest|jest|node|none>  --lint <eslint-prettier|biome|oxlint|none>
-  --license <MIT|Apache-2.0|ISC|none>
+  --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
+  --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
+  --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>
+  --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
   -h, --help          Show this help
   -v, --version       Show version
 

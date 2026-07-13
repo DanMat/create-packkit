@@ -35,7 +35,8 @@ var OPTIONS = {
     default: ["library"],
     choices: [
       { value: "library", label: "Library (importable package)" },
-      { value: "cli", label: "CLI tool (ships a bin)" }
+      { value: "cli", label: "CLI tool (ships a bin)" },
+      { value: "service", label: "HTTP service (Hono)" }
     ]
   },
   framework: {
@@ -220,6 +221,7 @@ function normalizeConfig(input = {}) {
   cfg.srcExt = cfg.isReact ? cfg.isTs ? "tsx" : "jsx" : cfg.ext;
   cfg.hasLibrary = cfg.target.includes("library");
   cfg.hasCli = cfg.target.includes("cli");
+  cfg.hasService = cfg.target.includes("service");
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
   return cfg;
@@ -595,6 +597,81 @@ var react_default = {
   }
 };
 
+// src/core/features/service.js
+var service_default = {
+  id: "service",
+  active: (cfg) => cfg.hasService,
+  apply(cfg) {
+    const ext = cfg.ext;
+    const files = {
+      [`src/app.${ext}`]: appFile(cfg),
+      [`src/index.${ext}`]: serverFile(cfg),
+      Dockerfile: dockerfile(cfg),
+      ".dockerignore": "node_modules\ndist\n.git\n.env\n"
+    };
+    return {
+      files,
+      pkg: {
+        private: true,
+        scripts: {
+          start: "node dist/index.js",
+          dev: cfg.isTs ? "tsx watch src/index.ts" : "node --watch src/index.js"
+        },
+        dependencies: { hono: "^4.5.0", "@hono/node-server": "^1.12.0" },
+        ...cfg.isTs ? { devDependencies: { tsx: "^4.0.0" } } : {}
+      }
+    };
+  }
+};
+function appFile(cfg) {
+  const t = cfg.isTs;
+  return [
+    `import { Hono } from 'hono';`,
+    ``,
+    `export const app = new Hono();`,
+    ``,
+    `app.get('/', (c) => c.json({ ok: true, service: '${cfg.name}' }));`,
+    `app.get('/health', (c) => c.text('ok'));`,
+    ``
+  ].join("\n");
+}
+function serverFile(cfg) {
+  return [
+    `import { serve } from '@hono/node-server';`,
+    `import { app } from './app${cfg.isTs ? ".js" : ".js"}';`,
+    ``,
+    `const port = Number(process.env.PORT) || 3000;`,
+    `serve({ fetch: app.fetch, port }, (info) => {`,
+    `	console.log(\`Listening on http://localhost:\${info.port}\`);`,
+    `});`,
+    ``
+  ].join("\n");
+}
+function dockerfile(cfg) {
+  const node = cfg.nodeVersion;
+  const pm = cfg.packageManager;
+  const install = pm === "npm" ? "npm ci" : `${pm} install --frozen-lockfile`;
+  const build = pm === "npm" ? "npm run build" : `${pm} run build`;
+  return [
+    `FROM node:${node}-slim AS build`,
+    `WORKDIR /app`,
+    `COPY package*.json ./`,
+    `RUN ${install}`,
+    `COPY . .`,
+    `RUN ${build}`,
+    ``,
+    `FROM node:${node}-slim`,
+    `WORKDIR /app`,
+    `ENV NODE_ENV=production`,
+    `COPY --from=build /app/node_modules ./node_modules`,
+    `COPY --from=build /app/dist ./dist`,
+    `COPY package.json ./`,
+    `EXPOSE 3000`,
+    `CMD ["node", "dist/index.js"]`,
+    ``
+  ].join("\n");
+}
+
 // src/core/features/test.js
 var test_default = {
   id: "test",
@@ -656,6 +733,21 @@ function importPath(runner, cfg) {
 }
 function exampleTest(runner, cfg) {
   const imp = importPath(runner, cfg);
+  if (cfg.hasService) {
+    const api2 = runner === "jest" ? "" : `import { describe, it, expect } from 'vitest';
+`;
+    return [
+      api2 + `import { app } from './app.js';`,
+      ``,
+      `describe('app', () => {`,
+      `	it('responds on /', async () => {`,
+      `		const res = await app.request('/');`,
+      `		expect(res.status).toBe(200);`,
+      `	});`,
+      `});`,
+      ``
+    ].join("\n");
+  }
   if (cfg.isReact) {
     const api2 = runner === "jest" ? "" : `import { describe, it, expect } from 'vitest';
 `;
@@ -1410,6 +1502,7 @@ var features_default = [
   bundler_default,
   typescript_default,
   react_default,
+  service_default,
   test_default,
   lint_default,
   githooks_default,
@@ -1430,6 +1523,20 @@ var PRESETS = {
   cli: { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
   "react-lib": { language: "ts", framework: "react", target: ["library"], moduleFormat: "dual", test: "vitest" },
   "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "dual", bundler: "tsup", test: "vitest" },
+  "node-service": {
+    language: "ts",
+    target: ["service"],
+    moduleFormat: "esm",
+    bundler: "tsup",
+    test: "vitest",
+    lint: "eslint-prettier",
+    gitHooks: "simple-git-hooks",
+    release: "none",
+    workflows: ["ci"],
+    deps: "renovate",
+    agents: true,
+    vscode: true
+  },
   oss: {
     language: "ts",
     target: ["library"],
@@ -1479,6 +1586,18 @@ var PRESETS = {
   }
 };
 var PRESET_NAMES = Object.keys(PRESETS);
+var PRESET_INFO = {
+  "ts-lib": "TypeScript library \u2014 dual ESM/CJS, tsup, Vitest, ESLint.",
+  "js-lib": "JavaScript (ESM) library \u2014 tsup, Vitest, ESLint.",
+  "ts-cli": "TypeScript CLI + library \u2014 ESM, ships a bin.",
+  cli: "TypeScript CLI tool \u2014 ESM, ships a bin.",
+  "react-lib": "React component library (TS) \u2014 JSX, peer deps, jsdom tests.",
+  "react-lib-js": "React component library (JS) \u2014 JSX, peer deps, jsdom tests.",
+  "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
+  oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
+  minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",
+  full: "Everything on \u2014 library + CLI, all workflows and extras."
+};
 
 // src/core/index.js
 function fromPreset(name, overrides = {}) {
@@ -1538,6 +1657,7 @@ export {
   GROUPS,
   OPTIONS,
   PRESETS,
+  PRESET_INFO,
   PRESET_NAMES,
   defaultConfig,
   fromPreset,

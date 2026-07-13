@@ -5,6 +5,7 @@ import meta from './meta.js';
 import bundler from './bundler.js';
 import typescript from './typescript.js';
 import react from './react.js';
+import service from './service.js';
 import test from './test.js';
 import lint from './lint.js';
 import githooks from './githooks.js';
@@ -21,6 +22,7 @@ export default [
   bundler,
   typescript,
   react,
+  service,
   test,
   lint,
   githooks,

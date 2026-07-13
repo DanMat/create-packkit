@@ -8,6 +8,11 @@ export const PRESETS = {
   cli: { language: 'ts', target: ['cli', 'library'], moduleFormat: 'esm' },
   'react-lib': { language: 'ts', framework: 'react', target: ['library'], moduleFormat: 'dual', test: 'vitest' },
   'react-lib-js': { language: 'js', framework: 'react', target: ['library'], moduleFormat: 'dual', bundler: 'tsup', test: 'vitest' },
+  'node-service': {
+    language: 'ts', target: ['service'], moduleFormat: 'esm', bundler: 'tsup',
+    test: 'vitest', lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
+    release: 'none', workflows: ['ci'], deps: 'renovate', agents: true, vscode: true,
+  },
   oss: {
     language: 'ts', target: ['library'], moduleFormat: 'dual', bundler: 'tsup',
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
@@ -29,3 +34,17 @@ export const PRESETS = {
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
+
+// Short gists for the CLI help and the web configurator (tooltips + description).
+export const PRESET_INFO = {
+  'ts-lib': 'TypeScript library — dual ESM/CJS, tsup, Vitest, ESLint.',
+  'js-lib': 'JavaScript (ESM) library — tsup, Vitest, ESLint.',
+  'ts-cli': 'TypeScript CLI + library — ESM, ships a bin.',
+  cli: 'TypeScript CLI tool — ESM, ships a bin.',
+  'react-lib': 'React component library (TS) — JSX, peer deps, jsdom tests.',
+  'react-lib-js': 'React component library (JS) — JSX, peer deps, jsdom tests.',
+  'node-service': 'Node HTTP service (Hono) — tsx dev, tsup build, Dockerfile.',
+  oss: 'Full open-source library — coverage, CodeQL, Codecov, Renovate, Changesets.',
+  minimal: 'Bare TS library — tsup only, no tests/lint/CI.',
+  full: 'Everything on — library + CLI, all workflows and extras.',
+};

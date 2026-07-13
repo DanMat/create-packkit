@@ -65,6 +65,20 @@ function importPath(runner, cfg) {
 
 function exampleTest(runner, cfg) {
   const imp = importPath(runner, cfg);
+  if (cfg.hasService) {
+    const api = runner === 'jest' ? '' : `import { describe, it, expect } from 'vitest';\n`;
+    return [
+      api + `import { app } from './app.js';`,
+      ``,
+      `describe('app', () => {`,
+      `\tit('responds on /', async () => {`,
+      `\t\tconst res = await app.request('/');`,
+      `\t\texpect(res.status).toBe(200);`,
+      `\t});`,
+      `});`,
+      ``,
+    ].join('\n');
+  }
   if (cfg.isReact) {
     const api = runner === 'jest' ? '' : `import { describe, it, expect } from 'vitest';\n`;
     return [

@@ -6,7 +6,8 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - Core `config → files` engine (Node + browser)
 - CLI wizard + presets + non-interactive flags
 - Web configurator with client-side zip download
-- Targets: **library**, **CLI**, **React component library**
+- Targets: **library**, **CLI**, **React component library**, **HTTP service (Hono)**
+- Optional **minify**; **full CLI-flag parity** (the web "copy command" reproduces any config); preset **tooltips + gists**
 - Bundlers: tsup, tsdown, unbuild, rollup, none · Tests: Vitest, Jest, node:test
 - Lint: ESLint+Prettier, Biome, oxlint · Hooks: simple-git-hooks, husky, lefthook
 - Release: Changesets, release-it, np · GitHub Actions: CI, npm publish (provenance), Pages, CodeQL, Codecov, stale
@@ -18,9 +19,9 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [ ] **More frameworks** — Vue and Svelte component libraries (same peer-dep model as React).
 - [ ] **React app target** — a Vite SPA starter (distinct from the component-library target; overlaps create-vite, so opt-in).
 - [ ] **Monorepo target** — pnpm/turbo workspaces with multiple packages.
-- [ ] **Node service preset** — a small HTTP service (Hono/Fastify) with Dockerfile + CI.
+- [x] ~~Node service preset — Hono service with Dockerfile + CI.~~ **Shipped.**
+- [x] ~~Full CLI flag parity.~~ **Shipped.**
 - [ ] **Config file** — read defaults from `packkit.config.json` / a saved profile.
-- [ ] **Full CLI flag parity** — expose every web option as a flag so the copied command reproduces the exact config (workflows, extras, deps).
 - [ ] **tsup entry globbing** and multiple entry points.
 - [ ] **`npm create packkit` update check** — nudge when a newer version exists.
 

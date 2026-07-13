@@ -33,6 +33,7 @@ export const OPTIONS = {
     choices: [
       { value: 'library', label: 'Library (importable package)' },
       { value: 'cli', label: 'CLI tool (ships a bin)' },
+      { value: 'service', label: 'HTTP service (Hono)' },
     ],
   },
   framework: {
@@ -205,6 +206,7 @@ export function normalizeConfig(input = {}) {
   cfg.srcExt = cfg.isReact ? (cfg.isTs ? 'tsx' : 'jsx') : cfg.ext;
   cfg.hasLibrary = cfg.target.includes('library');
   cfg.hasCli = cfg.target.includes('cli');
+  cfg.hasService = cfg.target.includes('service');
   cfg.hasEsm = cfg.moduleFormat === 'esm' || cfg.moduleFormat === 'dual';
   cfg.hasCjs = cfg.moduleFormat === 'cjs' || cfg.moduleFormat === 'dual';
   return cfg;

@@ -1,4 +1,4 @@
-import { generate, OPTIONS, GROUPS, defaultConfig, PRESETS } from './packkit-core.js';
+import { generate, OPTIONS, GROUPS, defaultConfig, PRESETS, PRESET_INFO } from './packkit-core.js';
 
 // Options that only matter to the CLI (disk/git) — hide them from the web form.
 const HIDDEN = new Set(['gitInit', 'install']);
@@ -64,13 +64,19 @@ function chip(label, on, multi, onclick) {
 }
 
 // ---- presets ---------------------------------------------------------------
+const PRESET_HINT = 'Quick-start from a common setup — hover for details.';
 function renderPresets() {
   const bar = $('#presets');
+  const desc = $('#presetDesc');
   for (const name of Object.keys(PRESETS)) {
-    const b = el('button', { textContent: name });
-    b.onclick = () => { Object.assign(state, PRESETS[name]); update(); renderForm(); };
+    const info = PRESET_INFO[name] || '';
+    const b = el('button', { textContent: name, title: info });
+    b.onmouseenter = () => { if (info) desc.textContent = info; };
+    b.onfocus = b.onmouseenter;
+    b.onclick = () => { Object.assign(state, PRESETS[name]); if (info) desc.textContent = info; update(); renderForm(); };
     bar.append(b);
   }
+  bar.onmouseleave = () => { desc.textContent = PRESET_HINT; };
 }
 
 // ---- live preview ----------------------------------------------------------
@@ -87,11 +93,18 @@ function update() {
 function commandFor(cfg) {
   const d = defaultConfig();
   const parts = ['npx create-packkit', cfg.name || 'my-package'];
-  const flag = (k, f) => { if (JSON.stringify(cfg[k]) !== JSON.stringify(d[k])) parts.push(`--${f} ${Array.isArray(cfg[k]) ? cfg[k].join(',') : cfg[k]}`); };
+  const diff = (k) => JSON.stringify(cfg[k]) !== JSON.stringify(d[k]);
+  const flag = (k, f) => { if (diff(k)) parts.push(`--${f} ${cfg[k]}`); };
   flag('language', 'language'); flag('framework', 'framework'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
-  flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release');
-  flag('license', 'license'); flag('packageManager', 'pm');
-  if (JSON.stringify(cfg.target) !== JSON.stringify(d.target)) parts.push(`--target ${cfg.target.join(' --target ')}`);
+  flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release'); flag('deps', 'deps');
+  flag('license', 'license'); flag('packageManager', 'pm'); flag('nodeVersion', 'node');
+  if (diff('target')) cfg.target.forEach((t) => parts.push(`--target ${t}`));
+  if (diff('workflows')) cfg.workflows.forEach((w) => parts.push(`--workflows ${w}`));
+  if (cfg.minify) parts.push('--minify');
+  if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
+  for (const b of ['community', 'agents', 'vscode', 'editorconfig']) {
+    if (cfg[b] === false && d[b] === true) parts.push(`--no-${b}`);
+  }
   return parts.join(' ');
 }
 

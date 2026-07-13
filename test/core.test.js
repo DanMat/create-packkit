@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generate, fromPreset, normalizeConfig } from '../src/core/index.js';
+import { generate, fromPreset, normalizeConfig, PRESETS, PRESET_INFO } from '../src/core/index.js';
+
+test('node-service: Hono app, Dockerfile, private, start script', () => {
+  const out = generate(fromPreset('node-service', { name: 'svc' }));
+  assert.ok(out.files['src/app.ts'], 'app');
+  assert.ok(out.files['src/index.ts'], 'server entry');
+  assert.ok(out.files['Dockerfile'], 'Dockerfile');
+  assert.match(out.files['src/app.ts'], /new Hono\(\)/);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.private, true);
+  assert.ok(pkg.dependencies.hono);
+  assert.equal(pkg.scripts.start, 'node dist/index.js');
+});
+
+test('every preset has an info gist', () => {
+  for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
+});
 
 test('ts-lib: valid package.json with dual exports', () => {
   const out = generate(fromPreset('ts-lib', { name: 'x-lib' }));

@@ -35,9 +35,13 @@
   .preview { padding: 22px 24px; background: var(--panel); border-left: 1px solid var(--line); position: sticky; top: 0; align-self: start; }
   @media (max-width: 900px) { .preview { border-left: 0; border-top: 1px solid var(--line); position: static; } }
 
-  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-  .presets button { font-family: var(--mono); font-size: 12px; padding: 8px 12px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
-  .presets button:hover { border-color: var(--accent2); color: #fff; }
+  .presets-wrap { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .presets-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .presets-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; }
+  .presets-desc { font-size: 12.5px; color: var(--accent2); min-height: 16px; transition: color .1s; }
+  .presets { display: flex; gap: 7px; flex-wrap: wrap; }
+  .presets button { font-family: var(--mono); font-size: 12px; padding: 7px 11px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: .1s; }
+  .presets button:hover { border-color: var(--accent2); color: #fff; background: color-mix(in srgb, var(--accent2) 14%, var(--panel2)); }
 
   .group { margin-bottom: 18px; }
   .group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
@@ -85,7 +89,13 @@
 
 <main>
   <section class="config">
-    <div class="presets" id="presets"></div>
+    <div class="presets-wrap">
+      <div class="presets-head">
+        <span class="presets-label">Presets</span>
+        <span class="presets-desc" id="presetDesc">Quick-start from a common setup — hover for details.</span>
+      </div>
+      <div class="presets" id="presets"></div>
+    </div>
     <form id="form"></form>
   </section>
 

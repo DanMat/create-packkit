@@ -6,9 +6,9 @@ import { normalizeConfig, OPTIONS, GROUPS, defaultConfig } from './options.js';
 import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
-import { PRESETS, PRESET_NAMES } from './presets.js';
+import { PRESETS, PRESET_NAMES, PRESET_INFO } from './presets.js';
 
-export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES };
+export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO };
 
 /** Apply a named preset over the defaults, returning a full config. */
 export function fromPreset(name, overrides = {}) {

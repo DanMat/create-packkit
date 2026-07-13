@@ -11,11 +11,21 @@ const OVERRIDE_FLAGS = {
   lint: 'lint',
   hooks: 'gitHooks',
   release: 'release',
+  deps: 'deps',
   license: 'license',
   pm: 'packageManager',
   node: 'nodeVersion',
   author: 'author',
   description: 'description',
+};
+
+// Boolean options that default ON — a --no-<flag> turns them off.
+const NEGATABLE = {
+  'no-coverage': 'coverage',
+  'no-community': 'community',
+  'no-agents': 'agents',
+  'no-vscode': 'vscode',
+  'no-editorconfig': 'editorconfig',
 };
 
 export function parseCliArgs(argv) {
@@ -31,9 +41,11 @@ export function parseCliArgs(argv) {
       'no-git': { type: 'boolean' },
       minify: { type: 'boolean' },
       target: { type: 'string', multiple: true },
+      workflows: { type: 'string', multiple: true },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
       ...Object.fromEntries(Object.keys(OVERRIDE_FLAGS).map((k) => [k, { type: 'string' }])),
+      ...Object.fromEntries(Object.keys(NEGATABLE).map((k) => [k, { type: 'boolean' }])),
     },
   });
 
@@ -48,7 +60,11 @@ export function parseCliArgs(argv) {
     if (values[flag] != null) overrides[key] = values[flag];
   }
   if (values.target) overrides.target = values.target;
+  if (values.workflows) overrides.workflows = values.workflows;
   if (values.minify) overrides.minify = true;
+  for (const [flag, key] of Object.entries(NEGATABLE)) {
+    if (values[flag]) overrides[key] = false;
+  }
   if (name) overrides.name = name;
 
   return {
