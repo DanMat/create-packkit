@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Packkit — configure & download a modern npm package</title>
+<meta name="description" content="Pick your stack — TypeScript/JS, bundler, tests, linter, CI, releases — and download a ready-to-ship npm package or CLI as a zip. Runs entirely in your browser." />
+<meta property="og:title" content="Packkit — npm package & CLI configurator" />
+<meta property="og:description" content="Configure a modern npm package or CLI and download it as a zip. No install." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12151d; --panel2: #171b25; --line: #232838;
+    --ink: #e7ecf5; --muted: #8b95a9; --accent: #00e5ff; --accent2: #7c5cff; --good: #3ddc97;
+    --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--ink); line-height: 1.5; }
+  a { color: var(--accent); text-decoration: none; }
+  header { border-bottom: 1px solid var(--line); padding: 18px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .logo { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; }
+  .logo b { color: var(--accent); }
+  .tagline { color: var(--muted); font-size: 14px; flex: 1; min-width: 200px; }
+  .links { display: flex; gap: 8px; }
+  .links a { font-size: 13px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); }
+  .links a:hover { border-color: var(--accent); }
+
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 61px); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  .config { padding: 22px 24px; overflow-y: auto; }
+  .preview { padding: 22px 24px; background: var(--panel); border-left: 1px solid var(--line); position: sticky; top: 0; align-self: start; }
+  @media (max-width: 900px) { .preview { border-left: 0; border-top: 1px solid var(--line); position: static; } }
+
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .presets button { font-family: var(--mono); font-size: 12px; padding: 8px 12px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+  .presets button:hover { border-color: var(--accent2); color: #fff; }
+
+  .group { margin-bottom: 18px; }
+  .group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+  .field { margin-bottom: 12px; }
+  .field > label { display: block; font-size: 13px; color: var(--ink); margin-bottom: 6px; font-weight: 500; }
+  .field input[type=text] { width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 9px 11px; font-family: var(--mono); font-size: 13px; }
+  .field input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 12.5px; padding: 7px 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; color: var(--muted); user-select: none; transition: .12s; }
+  .chip:hover { color: var(--ink); }
+  .chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); color: #fff; }
+  .chip.multi.on { background: color-mix(in srgb, var(--accent2) 20%, transparent); border-color: var(--accent2); }
+
+  .cmd { font-family: var(--mono); font-size: 12.5px; background: #05060a; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; color: #cfe6ff; overflow-x: auto; white-space: pre; margin-bottom: 12px; }
+  .actions { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .btn { font-size: 14px; font-weight: 600; padding: 11px 18px; border-radius: 9px; border: 0; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: #06131a; }
+  .btn.primary:hover { background: #4af0ff; }
+  .btn.ghost { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover { border-color: var(--accent); }
+
+  .preview h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 16px 0 8px; }
+  .split { display: grid; grid-template-columns: 220px 1fr; gap: 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+  .tree { font-family: var(--mono); font-size: 12px; padding: 10px; max-height: 420px; overflow-y: auto; border-right: 1px solid var(--line); }
+  .tree .row { padding: 2px 4px; border-radius: 5px; cursor: pointer; white-space: nowrap; color: var(--muted); }
+  .tree .row.dir { color: var(--ink); }
+  .tree .row.file:hover { background: var(--panel2); color: var(--ink); }
+  .tree .row.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: #fff; }
+  .filebody { font-family: var(--mono); font-size: 12px; padding: 12px; max-height: 420px; overflow: auto; white-space: pre; color: #cfe6ff; tab-size: 2; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .count { color: var(--good); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">📦 <b>Packkit</b></div>
+  <div class="tagline">Configure a modern npm package or CLI — download it as a zip, or copy the command.</div>
+  <div class="links">
+    <a href="https://github.com/DanMat/create-packkit">GitHub</a>
+    <a href="https://www.npmjs.com/package/create-packkit">npm</a>
+  </div>
+</header>
+
+<main>
+  <section class="config">
+    <div class="presets" id="presets"></div>
+    <form id="form"></form>
+  </section>
+
+  <aside class="preview">
+    <h3>Command</h3>
+    <div class="cmd" id="cmd">npx packkit</div>
+    <div class="actions">
+      <button class="btn primary" id="download">↓ Download .zip</button>
+      <button class="btn ghost" id="copy">Copy command</button>
+    </div>
+    <h3>Files <span class="count" id="fileCount"></span></h3>
+    <div class="split">
+      <div class="tree" id="tree"></div>
+      <pre class="filebody" id="filebody">Select a file to preview…</pre>
+    </div>
+    <div class="meta" id="stack"></div>
+  </aside>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
