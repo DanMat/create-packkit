@@ -55,6 +55,7 @@ export default {
       pkg.devDependencies = {
         rollup: '^4.0.0',
         ...(cfg.isTs ? { '@rollup/plugin-typescript': '^11.0.0', tslib: '^2.6.0' } : {}),
+        ...(cfg.minify ? { '@rollup/plugin-terser': '^0.4.0' } : {}),
       };
     } else if (cfg.bundler === 'none' && cfg.isTs) {
       // tsc-only build for TypeScript.
@@ -81,6 +82,7 @@ function tsupConfig(cfg, entries, formats, tool) {
     `\tsourcemap: true,`,
     `\tclean: true,`,
     `\ttreeshake: true,`,
+    cfg.minify ? `\tminify: true,` : null,
     `});`,
     ``,
   ].filter((l) => l !== null).join('\n');
@@ -94,7 +96,7 @@ function unbuildConfig(cfg) {
     `\tentries: ['src/index'],`,
     `\tdeclaration: ${cfg.isTs},`,
     `\tclean: true,`,
-    `\trollup: { emitCJS: ${cfg.hasCjs} },`,
+    `\trollup: { emitCJS: ${cfg.hasCjs}${cfg.minify ? ', esbuild: { minify: true }' : ''} },`,
     `});`,
     ``,
   ].join('\n');
@@ -104,14 +106,18 @@ function rollupConfig(cfg, formats) {
   const out = formats
     .map((f) => `\t\t{ file: 'dist/index.${f === 'cjs' ? 'cjs' : 'js'}', format: '${f}', sourcemap: true }`)
     .join(',\n');
-  const tsPlugin = cfg.isTs ? `\n\tplugins: [typescript()],` : '';
-  const tsImport = cfg.isTs ? `import typescript from '@rollup/plugin-typescript';\n` : '';
+  const imports = [
+    cfg.isTs ? `import typescript from '@rollup/plugin-typescript';` : null,
+    cfg.minify ? `import terser from '@rollup/plugin-terser';` : null,
+  ].filter(Boolean);
+  const plugins = [cfg.isTs ? 'typescript()' : null, cfg.minify ? 'terser()' : null].filter(Boolean);
+  const pluginLine = plugins.length ? `\n\tplugins: [${plugins.join(', ')}],` : '';
   return [
-    tsImport + `export default {`,
+    (imports.length ? imports.join('\n') + '\n' : '') + `export default {`,
     `\tinput: 'src/index.${cfg.ext}',`,
     `\toutput: [`,
     out,
-    `\t],${tsPlugin}`,
+    `\t],${pluginLine}`,
     `};`,
     ``,
   ].join('\n');

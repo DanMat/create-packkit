@@ -41,6 +41,14 @@ test('react-lib: JSX source, peer deps, jsdom tests', () => {
   assert.equal(JSON.parse(out.files['tsconfig.json']).compilerOptions.jsx, 'react-jsx');
 });
 
+test('minify: flows into the tsup config, off by default and with no bundler', () => {
+  assert.match(generate(fromPreset('ts-lib', { name: 'm', minify: true })).files['tsup.config.ts'], /minify: true/);
+  assert.doesNotMatch(generate(fromPreset('ts-lib', { name: 'm' })).files['tsup.config.ts'], /minify: true/);
+  // no bundler → minify is coerced off (nothing to minify)
+  const none = generate(normalizeConfig({ name: 'm', bundler: 'none', minify: true }));
+  assert.equal(none.config.minify, false);
+});
+
 test('minimal preset: no tooling extras', () => {
   const out = generate(fromPreset('minimal', { name: 'm' }));
   assert.equal(out.files['vitest.config.ts'], undefined);

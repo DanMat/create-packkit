@@ -71,6 +71,9 @@ export const OPTIONS = {
       { value: 'none', label: 'None (tsc / no build)' },
     ],
   },
+  minify: {
+    group: 'build', type: 'boolean', label: 'Minify output (best for CLIs / browser bundles)', default: false,
+  },
 
   // ---- testing ----
   test: {
@@ -184,6 +187,8 @@ export function normalizeConfig(input = {}) {
   if (!Array.isArray(cfg.target) || cfg.target.length === 0) cfg.target = ['library'];
   if (!Array.isArray(cfg.workflows)) cfg.workflows = [];
 
+  // Minify needs a bundler.
+  if (cfg.bundler === 'none') cfg.minify = false;
   // Coverage only makes sense with a test runner that supports it.
   if (cfg.test === 'none' || cfg.test === 'node') cfg.coverage = false;
   // Codecov workflow implies coverage.

@@ -29,6 +29,7 @@ export function parseCliArgs(argv) {
       here: { type: 'boolean' },
       'no-install': { type: 'boolean' },
       'no-git': { type: 'boolean' },
+      minify: { type: 'boolean' },
       target: { type: 'string', multiple: true },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -47,6 +48,7 @@ export function parseCliArgs(argv) {
     if (values[flag] != null) overrides[key] = values[flag];
   }
   if (values.target) overrides.target = values.target;
+  if (values.minify) overrides.minify = true;
   if (name) overrides.name = name;
 
   return {

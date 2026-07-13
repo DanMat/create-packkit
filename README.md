@@ -36,7 +36,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 | **Module format** | ESM · CJS · dual (proper `exports` map) |
 | **Target** | Library · CLI tool · both |
 | **Framework** | None · **React** (component library — JSX, peer deps, jsdom tests) |
-| **Bundler** | tsup · tsdown · unbuild · rollup · none (tsc) |
+| **Bundler** | tsup · tsdown · unbuild · rollup · none (tsc) · optional **minify** |
 | **Tests** | Vitest · Jest · node:test · none (+ coverage) |
 | **Lint/format** | ESLint + Prettier · Biome · oxlint · none |
 | **Git hooks** | simple-git-hooks · husky + lint-staged · lefthook · none |

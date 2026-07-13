@@ -32,6 +32,9 @@ export async function runWizard(seed = {}) {
   cfg.moduleFormat = bail(await p.select({ message: 'Module format', options: asOptions('moduleFormat'), initialValue: OPTIONS.moduleFormat.default }));
   cfg.packageManager = bail(await p.select({ message: 'Package manager', options: asOptions('packageManager'), initialValue: OPTIONS.packageManager.default }));
   cfg.bundler = bail(await p.select({ message: 'Build / bundler', options: asOptions('bundler'), initialValue: OPTIONS.bundler.default }));
+  if (cfg.bundler !== 'none') {
+    cfg.minify = bail(await p.confirm({ message: 'Minify the build output?', initialValue: false }));
+  }
   cfg.test = bail(await p.select({ message: 'Test runner', options: asOptions('test'), initialValue: OPTIONS.test.default }));
   cfg.lint = bail(await p.select({ message: 'Lint / format', options: asOptions('lint'), initialValue: OPTIONS.lint.default }));
   cfg.gitHooks = bail(await p.select({ message: 'Git hooks', options: asOptions('gitHooks'), initialValue: OPTIONS.gitHooks.default }));

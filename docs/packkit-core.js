@@ -85,6 +85,12 @@ var OPTIONS = {
       { value: "none", label: "None (tsc / no build)" }
     ]
   },
+  minify: {
+    group: "build",
+    type: "boolean",
+    label: "Minify output (best for CLIs / browser bundles)",
+    default: false
+  },
   // ---- testing ----
   test: {
     group: "quality",
@@ -204,6 +210,7 @@ function normalizeConfig(input = {}) {
   const cfg = { ...defaultConfig(), ...input };
   if (!Array.isArray(cfg.target) || cfg.target.length === 0) cfg.target = ["library"];
   if (!Array.isArray(cfg.workflows)) cfg.workflows = [];
+  if (cfg.bundler === "none") cfg.minify = false;
   if (cfg.test === "none" || cfg.test === "node") cfg.coverage = false;
   if (cfg.workflows.includes("codecov")) cfg.coverage = true;
   cfg.isReact = cfg.framework === "react";
@@ -456,7 +463,8 @@ var bundler_default = {
       pkg.scripts.dev = "rollup -c -w";
       pkg.devDependencies = {
         rollup: "^4.0.0",
-        ...cfg.isTs ? { "@rollup/plugin-typescript": "^11.0.0", tslib: "^2.6.0" } : {}
+        ...cfg.isTs ? { "@rollup/plugin-typescript": "^11.0.0", tslib: "^2.6.0" } : {},
+        ...cfg.minify ? { "@rollup/plugin-terser": "^0.4.0" } : {}
       };
     } else if (cfg.bundler === "none" && cfg.isTs) {
       pkg.scripts.build = "tsc";
@@ -479,6 +487,7 @@ function tsupConfig(cfg, entries, formats, tool) {
     `	sourcemap: true,`,
     `	clean: true,`,
     `	treeshake: true,`,
+    cfg.minify ? `	minify: true,` : null,
     `});`,
     ``
   ].filter((l) => l !== null).join("\n");
@@ -491,23 +500,26 @@ function unbuildConfig(cfg) {
     `	entries: ['src/index'],`,
     `	declaration: ${cfg.isTs},`,
     `	clean: true,`,
-    `	rollup: { emitCJS: ${cfg.hasCjs} },`,
+    `	rollup: { emitCJS: ${cfg.hasCjs}${cfg.minify ? ", esbuild: { minify: true }" : ""} },`,
     `});`,
     ``
   ].join("\n");
 }
 function rollupConfig(cfg, formats) {
   const out = formats.map((f) => `		{ file: 'dist/index.${f === "cjs" ? "cjs" : "js"}', format: '${f}', sourcemap: true }`).join(",\n");
-  const tsPlugin = cfg.isTs ? `
-	plugins: [typescript()],` : "";
-  const tsImport = cfg.isTs ? `import typescript from '@rollup/plugin-typescript';
-` : "";
+  const imports = [
+    cfg.isTs ? `import typescript from '@rollup/plugin-typescript';` : null,
+    cfg.minify ? `import terser from '@rollup/plugin-terser';` : null
+  ].filter(Boolean);
+  const plugins = [cfg.isTs ? "typescript()" : null, cfg.minify ? "terser()" : null].filter(Boolean);
+  const pluginLine = plugins.length ? `
+	plugins: [${plugins.join(", ")}],` : "";
   return [
-    tsImport + `export default {`,
+    (imports.length ? imports.join("\n") + "\n" : "") + `export default {`,
     `	input: 'src/index.${cfg.ext}',`,
     `	output: [`,
     out,
-    `	],${tsPlugin}`,
+    `	],${pluginLine}`,
     `};`,
     ``
   ].join("\n");
