@@ -14,10 +14,11 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - Renovate/Dependabot · community files · AGENTS.md + CLAUDE.md · VS Code
 
 ## Next up
-- [ ] **Defaults refresh** — consider `tsdown` and `Biome` as the recommended defaults as they stabilize.
-- [ ] **Storybook option** for React component libraries (stories + a Pages-deployed catalog).
-- [ ] **More frameworks** — Vue and Svelte component libraries (same peer-dep model as React).
-- [ ] **React app target** — a Vite SPA starter (distinct from the component-library target; overlaps create-vite, so opt-in).
+- [x] ~~Storybook option for React component libraries.~~ **Shipped** (React/Vue/Svelte, Vite builder).
+- [x] ~~More frameworks — Vue and Svelte component libraries.~~ **Shipped.**
+- [x] ~~React app target — a Vite SPA starter.~~ **Shipped** (React/Vue/Svelte apps).
+- [ ] **Defaults refresh** — consider `tsdown` and `Biome` as recommended defaults as they stabilize.
+- [ ] **Storybook Pages deploy** — a workflow to publish `storybook-static` to GitHub Pages.
 - [ ] **Monorepo target** — pnpm/turbo workspaces with multiple packages.
 - [x] ~~Node service preset — Hono service with Dockerfile + CI.~~ **Shipped.**
 - [x] ~~Full CLI flag parity.~~ **Shipped.**

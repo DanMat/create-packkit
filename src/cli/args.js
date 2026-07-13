@@ -42,6 +42,8 @@ export function parseCliArgs(argv) {
       minify: { type: 'boolean' },
       target: { type: 'string', multiple: true },
       workflows: { type: 'string', multiple: true },
+      minify: { type: 'boolean' },
+      storybook: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
       ...Object.fromEntries(Object.keys(OVERRIDE_FLAGS).map((k) => [k, { type: 'string' }])),
@@ -62,6 +64,7 @@ export function parseCliArgs(argv) {
   if (values.target) overrides.target = values.target;
   if (values.workflows) overrides.workflows = values.workflows;
   if (values.minify) overrides.minify = true;
+  if (values.storybook) overrides.storybook = true;
   for (const [flag, key] of Object.entries(NEGATABLE)) {
     if (values[flag]) overrides[key] = false;
   }

@@ -12,7 +12,7 @@ export default {
     if (cfg.isTs) commands.push(`- Type-check: \`${run('typecheck')}\``);
     if (cfg.lint !== 'none') commands.push(`- Lint: \`${run('lint')}\``);
     if (cfg.test !== 'none') commands.push(`- Test: \`${test}\``);
-    if (cfg.bundler !== 'none' || cfg.isTs) commands.push(`- Build: \`${run('build')}\``);
+    if (cfg.hasBuild) commands.push(`- Build: \`${run('build')}\``);
 
     const stack = [
       `- Language: ${cfg.isTs ? 'TypeScript (strict)' : 'JavaScript (ESM)'}`,

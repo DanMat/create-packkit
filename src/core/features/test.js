@@ -11,13 +11,23 @@ export default {
     const testExt = cfg.isReact ? cfg.srcExt : ext;
 
     if (cfg.test === 'vitest') {
+      const fw = cfg.isVue
+        ? { imp: `import vue from '@vitejs/plugin-vue';`, call: 'vue()' }
+        : cfg.isSvelte
+          ? {
+              imp: `import { svelte } from '@sveltejs/vite-plugin-svelte';\nimport { svelteTesting } from '@testing-library/svelte/vite';`,
+              call: 'svelte(), svelteTesting()',
+            }
+          : null;
       files[`vitest.config.${ext}`] = [
+        fw ? fw.imp : null,
         `import { defineConfig } from 'vitest/config';`,
         ``,
         `export default defineConfig({`,
+        fw ? `\tplugins: [${fw.call}],` : null,
         `\ttest: {`,
-        cfg.isReact ? `\t\tenvironment: 'jsdom',` : null,
-        cfg.isReact ? `\t\tglobals: true,` : null,
+        cfg.hasFramework ? `\t\tenvironment: 'jsdom',` : null,
+        cfg.hasFramework ? `\t\tglobals: true,` : null,
         cfg.coverage ? `\t\tcoverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,
         `\t},`,
         `});`,
@@ -26,10 +36,12 @@ export default {
       pkg.scripts.test = 'vitest run';
       pkg.scripts['test:watch'] = 'vitest';
       pkg.devDependencies.vitest = '^2.0.0';
-      if (cfg.isReact) {
+      if (cfg.hasFramework) {
         pkg.devDependencies.jsdom = '^25.0.0';
-        pkg.devDependencies['@testing-library/react'] = '^16.0.0';
         pkg.devDependencies['@testing-library/dom'] = '^10.0.0';
+        if (cfg.isReact) pkg.devDependencies['@testing-library/react'] = '^16.0.0';
+        if (cfg.isVue) pkg.devDependencies['@testing-library/vue'] = '^8.1.0';
+        if (cfg.isSvelte) pkg.devDependencies['@testing-library/svelte'] = '^5.2.0';
       }
       if (cfg.coverage) {
         pkg.scripts.coverage = 'vitest run --coverage';
@@ -79,16 +91,32 @@ function exampleTest(runner, cfg) {
       ``,
     ].join('\n');
   }
-  if (cfg.isReact) {
+  if (cfg.hasFramework) {
     const api = runner === 'jest' ? '' : `import { describe, it, expect } from 'vitest';\n`;
+    const app = cfg.hasApp;
+    const label = app ? '/Hello from/' : `'Click me'`;
+    let lib, importLine, renderCall;
+    if (cfg.isReact) {
+      lib = '@testing-library/react';
+      importLine = app ? `import { App } from './App.js';` : `import { Button } from './index.js';`;
+      renderCall = app ? `render(<App />)` : `render(<Button label="Click me" />)`;
+    } else if (cfg.isVue) {
+      lib = '@testing-library/vue';
+      importLine = app ? `import App from './App.vue';` : `import { Button } from './index.js';`;
+      renderCall = app ? `render(App)` : `render(Button, { props: { label: 'Click me' } })`;
+    } else {
+      lib = '@testing-library/svelte';
+      importLine = app ? `import App from './App.svelte';` : `import Button from './Button.svelte';`;
+      renderCall = app ? `render(App)` : `render(Button, { props: { label: 'Click me' } })`;
+    }
     return [
-      api + `import { render, screen } from '@testing-library/react';`,
-      `import { Button } from '${imp}';`,
+      api + `import { render, screen } from '${lib}';`,
+      importLine,
       ``,
-      `describe('Button', () => {`,
-      `\tit('renders its label', () => {`,
-      `\t\trender(<Button label="Click me" />);`,
-      `\t\texpect(screen.getByText('Click me')).toBeDefined();`,
+      `describe('${app ? 'App' : 'Button'}', () => {`,
+      `\tit('renders', () => {`,
+      `\t\t${renderCall};`,
+      `\t\texpect(screen.getByText(${label})).toBeDefined();`,
       `\t});`,
       `});`,
       ``,

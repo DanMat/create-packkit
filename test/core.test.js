@@ -14,6 +14,49 @@ test('node-service: Hono app, Dockerfile, private, start script', () => {
   assert.equal(pkg.scripts.start, 'node dist/index.js');
 });
 
+test('react-app: Vite SPA, index.html, private, no exports', () => {
+  const out = generate(fromPreset('react-app', { name: 'ra' }));
+  assert.ok(out.files['index.html']);
+  assert.ok(out.files['src/main.tsx']);
+  assert.ok(out.files['vite.config.ts']);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.private, true);
+  assert.equal(pkg.exports, undefined);
+  assert.match(pkg.scripts.dev, /vite/);
+});
+
+test('vue-lib: Vite lib build with types, peer vue, vue-tsc typecheck', () => {
+  const out = generate(fromPreset('vue-lib', { name: 'vl' }));
+  assert.ok(out.files['src/Button.vue']);
+  assert.match(out.files['vite.config.ts'], /plugin-vue/);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.peerDependencies.vue, '>=3');
+  assert.equal(pkg.scripts.typecheck, 'vue-tsc --noEmit');
+  assert.ok(pkg.exports['.'].types);
+});
+
+test('svelte-lib: ships source, no build, svelte export field', () => {
+  const out = generate(fromPreset('svelte-lib', { name: 'sl' }));
+  assert.ok(out.files['src/Button.svelte']);
+  assert.ok(out.files['svelte.config.js']);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.scripts.build, undefined, 'no build');
+  assert.ok(pkg.svelte);
+  assert.equal(pkg.peerDependencies.svelte, '>=5');
+  assert.equal(out.config.hasBuild, false);
+});
+
+test('storybook: config + story + deps for a react library', () => {
+  const out = generate(fromPreset('react-lib', { name: 's', storybook: true }));
+  assert.ok(out.files['.storybook/main.ts']);
+  assert.ok(out.files['src/Button.stories.tsx']);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.ok(pkg.devDependencies['@storybook/react-vite']);
+  assert.ok(pkg.scripts['build-storybook']);
+  // storybook is ignored where it doesn't apply (no framework)
+  assert.equal(generate(fromPreset('ts-lib', { name: 's', storybook: true })).config.storybook, false);
+});
+
 test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });

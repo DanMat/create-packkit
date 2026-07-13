@@ -34,13 +34,16 @@ export const OPTIONS = {
       { value: 'library', label: 'Library (importable package)' },
       { value: 'cli', label: 'CLI tool (ships a bin)' },
       { value: 'service', label: 'HTTP service (Hono)' },
+      { value: 'app', label: 'App (Vite SPA)' },
     ],
   },
   framework: {
     group: 'core', type: 'select', label: 'Framework', default: 'none',
     choices: [
       { value: 'none', label: 'None (plain package)' },
-      { value: 'react', label: 'React (component library)' },
+      { value: 'react', label: 'React' },
+      { value: 'vue', label: 'Vue' },
+      { value: 'svelte', label: 'Svelte' },
     ],
   },
   packageManager: {
@@ -87,6 +90,7 @@ export const OPTIONS = {
     ],
   },
   coverage: { group: 'quality', type: 'boolean', label: 'Coverage reporting', default: true },
+  storybook: { group: 'quality', type: 'boolean', label: 'Storybook (component libraries)', default: false },
 
   // ---- lint / format ----
   lint: {
@@ -197,17 +201,40 @@ export function normalizeConfig(input = {}) {
   // npm-publish + changesets are complementary; nothing to coerce, just noted.
 
   cfg.isReact = cfg.framework === 'react';
-  // A React component library is a library; make sure it's targeted.
-  if (cfg.isReact && !cfg.target.includes('library')) cfg.target = ['library', ...cfg.target];
+  cfg.isVue = cfg.framework === 'vue';
+  cfg.isSvelte = cfg.framework === 'svelte';
+  cfg.hasFramework = cfg.framework !== 'none';
+
+  cfg.hasApp = cfg.target.includes('app');
+  // A component-framework package that isn't an app is a library.
+  if (cfg.hasFramework && !cfg.hasApp && !cfg.target.includes('library')) {
+    cfg.target = ['library', ...cfg.target];
+  }
 
   cfg.isTs = cfg.language === 'ts';
   cfg.ext = cfg.isTs ? 'ts' : 'js';
-  // Source files carry JSX for React; config files keep .ts/.js.
+  // JSX source extension for React; Vue/Svelte use their own component files.
   cfg.srcExt = cfg.isReact ? (cfg.isTs ? 'tsx' : 'jsx') : cfg.ext;
+
   cfg.hasLibrary = cfg.target.includes('library');
   cfg.hasCli = cfg.target.includes('cli');
   cfg.hasService = cfg.target.includes('service');
+
+  // Vite builds apps and Vue libraries (SFCs); Svelte libraries ship source
+  // (no build); React libraries use tsup (JSX is native to esbuild).
+  cfg.viteBuild = cfg.hasApp || cfg.isVue;
+  cfg.svelteLib = cfg.isSvelte && !cfg.hasApp;
+  cfg.customBuild = cfg.viteBuild || cfg.svelteLib; // bundler.js steps aside
+  cfg.usesVite = cfg.viteBuild || cfg.isSvelte; // Svelte tests need the vite plugin too
+  // Whether a `build` script exists (Svelte libraries ship source, no build).
+  cfg.hasBuild = cfg.viteBuild || (!cfg.svelteLib && (cfg.bundler !== 'none' || cfg.isTs));
+
+  // Apps aren't published packages.
+  if (cfg.hasApp) cfg.moduleFormat = 'esm';
   cfg.hasEsm = cfg.moduleFormat === 'esm' || cfg.moduleFormat === 'dual';
   cfg.hasCjs = cfg.moduleFormat === 'cjs' || cfg.moduleFormat === 'dual';
+
+  // Storybook only applies to component libraries.
+  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
   return cfg;
 }

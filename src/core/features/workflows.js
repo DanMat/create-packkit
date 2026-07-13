@@ -72,7 +72,7 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, 'typecheck')}`);
   if (cfg.lint !== 'none') jobs.push(`      - run: ${pmRun(cfg, 'lint')}`);
   if (cfg.test !== 'none') jobs.push(`      - run: ${pmRun(cfg, codecov ? 'coverage' : 'test')}`);
-  if (cfg.bundler !== 'none' || cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, 'build')}`);
+  if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, 'build')}`);
   const cov = codecov
     ? '\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}'
     : '';
@@ -131,7 +131,7 @@ function releaseWorkflow(cfg) {
     '  publish:',
     '    runs-on: ubuntu-latest',
     setupSteps(cfg),
-    cfg.bundler !== 'none' || cfg.isTs ? `      - run: ${pmRun(cfg, 'build')}` : null,
+    cfg.hasBuild ? `      - run: ${pmRun(cfg, 'build')}` : null,
     '      - run: npm publish --provenance --access public',
     '        env:',
     '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',

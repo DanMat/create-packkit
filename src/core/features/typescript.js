@@ -4,19 +4,20 @@ export default {
   id: 'typescript',
   active: (cfg) => cfg.isTs,
   apply(cfg) {
-    const noBuild = cfg.bundler === 'none';
+    const noBuild = cfg.bundler === 'none' && !cfg.customBuild;
+    const webLibs = cfg.hasFramework || cfg.hasApp;
     const compilerOptions = {
       target: 'ES2022',
       module: 'ESNext',
       moduleResolution: 'Bundler',
-      lib: cfg.isReact ? ['ES2022', 'DOM', 'DOM.Iterable'] : ['ES2022'],
+      lib: webLibs ? ['ES2022', 'DOM', 'DOM.Iterable'] : ['ES2022'],
       ...(cfg.isReact ? { jsx: 'react-jsx' } : {}),
       strict: true,
       noUncheckedIndexedAccess: true,
       esModuleInterop: true,
       skipLibCheck: true,
       forceConsistentCasingInFileNames: true,
-      verbatimModuleSyntax: cfg.bundler !== 'none',
+      verbatimModuleSyntax: cfg.bundler !== 'none' && !cfg.hasFramework,
       declaration: true,
     };
     if (noBuild) {

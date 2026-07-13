@@ -34,8 +34,9 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 |---|---|
 | **Language** | TypeScript (strict) · JavaScript (ESM) |
 | **Module format** | ESM · CJS · dual (proper `exports` map) |
-| **Target** | Library · CLI tool · **HTTP service (Hono)** · any combination |
-| **Framework** | None · **React** (component library — JSX, peer deps, jsdom tests) |
+| **Target** | Library · CLI tool · **HTTP service (Hono)** · **App (Vite SPA)** · any combination |
+| **Framework** | None · **React** · **Vue** · **Svelte** (component libraries or apps) |
+| **Storybook** | optional, for React / Vue / Svelte component libraries |
 | **Bundler** | tsup · tsdown · unbuild · rollup · none (tsc) · optional **minify** |
 | **Tests** | Vitest · Jest · node:test · none (+ coverage) |
 | **Lint/format** | ESLint + Prettier · Biome · oxlint · none |
@@ -48,7 +49,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 
 ## Presets
 
-`ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `node-service` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
+`ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `react-app` · `vue-lib` · `svelte-lib` · `node-service` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
 
 ## How it works
 

@@ -23,10 +23,11 @@ export default {
       pkg.homepage = `${cfg.repo.replace(/\.git$/, '')}#readme`;
     }
 
-    // Source entry point.
-    files[`src/index.${cfg.srcExt}`] = cfg.hasLibrary
-      ? libraryEntry(cfg)
-      : `// ${cfg.name}\n`;
+    // Source entry point — only the plain library entry lives here; framework
+    // and app/cli/service modules write their own source.
+    if (cfg.hasLibrary && !cfg.hasFramework) {
+      files[`src/index.${cfg.ext}`] = libraryEntry(cfg);
+    }
 
     // README
     files['README.md'] = readme(cfg);
@@ -34,8 +35,15 @@ export default {
     // Node version pin
     files['.nvmrc'] = `${cfg.nodeVersion}\n`;
 
-    // A typecheck script for TS projects regardless of bundler.
-    if (cfg.isTs) pkg.scripts.typecheck = 'tsc --noEmit';
+    // A typecheck script for TS projects — framework-aware (plain tsc can't
+    // resolve .vue/.svelte modules).
+    if (cfg.isTs) {
+      pkg.scripts.typecheck = cfg.isVue
+        ? 'vue-tsc --noEmit'
+        : cfg.isSvelte
+          ? 'svelte-check --tsconfig ./tsconfig.json'
+          : 'tsc --noEmit';
+    }
 
     return { files, pkg };
   },
@@ -65,32 +73,8 @@ function libraryEntry(cfg) {
   ].join('\n');
 }
 
-function reactEntry(cfg) {
-  if (cfg.isTs) {
-    return [
-      `export interface ButtonProps {`,
-      `\t/** Text shown inside the button. */`,
-      `\tlabel: string;`,
-      `\tonClick?: () => void;`,
-      `}`,
-      ``,
-      `/** A tiny example component — replace me. */`,
-      `export function Button({ label, onClick }: ButtonProps) {`,
-      `\treturn <button onClick={onClick}>{label}</button>;`,
-      `}`,
-      ``,
-    ].join('\n');
-  }
-  return [
-    `/**`,
-    ` * A tiny example component — replace me.`,
-    ` * @param {{ label: string, onClick?: () => void }} props`,
-    ` */`,
-    `export function Button({ label, onClick }) {`,
-    `\treturn <button onClick={onClick}>{label}</button>;`,
-    `}`,
-    ``,
-  ].join('\n');
+function run(cfg, script) {
+  return cfg.packageManager === 'npm' ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
 }
 
 function readme(cfg) {
@@ -114,10 +98,17 @@ function readme(cfg) {
     '',
   ];
 
-  if (cfg.hasLibrary && cfg.isReact) {
+  if (cfg.hasApp) {
+    lines.push('## Develop', '', '```sh', run(cfg, 'dev') + '     # start the dev server', run(cfg, 'build') + '   # production build', '```', '');
+  } else if (cfg.hasLibrary && cfg.isReact) {
     lines.push('## Usage', '', '```' + (cfg.isTs ? 'tsx' : 'jsx'),
-      `import { Button } from '${cfg.name}';`, '',
-      `<Button label="Click me" onClick={() => alert('hi')} />`, '```', '');
+      `import { Button } from '${cfg.name}';`, '', `<Button label="Click me" />`, '```', '');
+  } else if (cfg.hasLibrary && cfg.isVue) {
+    lines.push('## Usage', '', '```' + (cfg.isTs ? 'ts' : 'js'),
+      `import { Button } from '${cfg.name}';`, '// then <Button label="Click me" /> in your template', '```', '');
+  } else if (cfg.hasLibrary && cfg.isSvelte) {
+    lines.push('## Usage', '', '```svelte',
+      `<script>import { Button } from '${cfg.name}';</script>`, '', `<Button label="Click me" />`, '```', '');
   } else if (cfg.hasLibrary) {
     const imp = cfg.isTs || cfg.hasEsm ? `import { greet } from '${cfg.name}';` : `const { greet } = require('${cfg.name}');`;
     lines.push('## Usage', '', '```' + (cfg.isTs ? 'ts' : 'js'), imp, '', `greet('world'); // "Hello, world!"`, '```', '');

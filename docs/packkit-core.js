@@ -36,7 +36,8 @@ var OPTIONS = {
     choices: [
       { value: "library", label: "Library (importable package)" },
       { value: "cli", label: "CLI tool (ships a bin)" },
-      { value: "service", label: "HTTP service (Hono)" }
+      { value: "service", label: "HTTP service (Hono)" },
+      { value: "app", label: "App (Vite SPA)" }
     ]
   },
   framework: {
@@ -46,7 +47,9 @@ var OPTIONS = {
     default: "none",
     choices: [
       { value: "none", label: "None (plain package)" },
-      { value: "react", label: "React (component library)" }
+      { value: "react", label: "React" },
+      { value: "vue", label: "Vue" },
+      { value: "svelte", label: "Svelte" }
     ]
   },
   packageManager: {
@@ -106,6 +109,7 @@ var OPTIONS = {
     ]
   },
   coverage: { group: "quality", type: "boolean", label: "Coverage reporting", default: true },
+  storybook: { group: "quality", type: "boolean", label: "Storybook (component libraries)", default: false },
   // ---- lint / format ----
   lint: {
     group: "quality",
@@ -215,15 +219,28 @@ function normalizeConfig(input = {}) {
   if (cfg.test === "none" || cfg.test === "node") cfg.coverage = false;
   if (cfg.workflows.includes("codecov")) cfg.coverage = true;
   cfg.isReact = cfg.framework === "react";
-  if (cfg.isReact && !cfg.target.includes("library")) cfg.target = ["library", ...cfg.target];
+  cfg.isVue = cfg.framework === "vue";
+  cfg.isSvelte = cfg.framework === "svelte";
+  cfg.hasFramework = cfg.framework !== "none";
+  cfg.hasApp = cfg.target.includes("app");
+  if (cfg.hasFramework && !cfg.hasApp && !cfg.target.includes("library")) {
+    cfg.target = ["library", ...cfg.target];
+  }
   cfg.isTs = cfg.language === "ts";
   cfg.ext = cfg.isTs ? "ts" : "js";
   cfg.srcExt = cfg.isReact ? cfg.isTs ? "tsx" : "jsx" : cfg.ext;
   cfg.hasLibrary = cfg.target.includes("library");
   cfg.hasCli = cfg.target.includes("cli");
   cfg.hasService = cfg.target.includes("service");
+  cfg.viteBuild = cfg.hasApp || cfg.isVue;
+  cfg.svelteLib = cfg.isSvelte && !cfg.hasApp;
+  cfg.customBuild = cfg.viteBuild || cfg.svelteLib;
+  cfg.usesVite = cfg.viteBuild || cfg.isSvelte;
+  cfg.hasBuild = cfg.viteBuild || !cfg.svelteLib && (cfg.bundler !== "none" || cfg.isTs);
+  if (cfg.hasApp) cfg.moduleFormat = "esm";
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
+  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
   return cfg;
 }
 
@@ -317,12 +334,15 @@ var meta_default = {
       pkg.bugs = { url: `${cfg.repo.replace(/\.git$/, "")}/issues` };
       pkg.homepage = `${cfg.repo.replace(/\.git$/, "")}#readme`;
     }
-    files[`src/index.${cfg.srcExt}`] = cfg.hasLibrary ? libraryEntry(cfg) : `// ${cfg.name}
-`;
+    if (cfg.hasLibrary && !cfg.hasFramework) {
+      files[`src/index.${cfg.ext}`] = libraryEntry(cfg);
+    }
     files["README.md"] = readme(cfg);
     files[".nvmrc"] = `${cfg.nodeVersion}
 `;
-    if (cfg.isTs) pkg.scripts.typecheck = "tsc --noEmit";
+    if (cfg.isTs) {
+      pkg.scripts.typecheck = cfg.isVue ? "vue-tsc --noEmit" : cfg.isSvelte ? "svelte-check --tsconfig ./tsconfig.json" : "tsc --noEmit";
+    }
     return { files, pkg };
   }
 };
@@ -349,32 +369,8 @@ function libraryEntry(cfg) {
     ``
   ].join("\n");
 }
-function reactEntry(cfg) {
-  if (cfg.isTs) {
-    return [
-      `export interface ButtonProps {`,
-      `	/** Text shown inside the button. */`,
-      `	label: string;`,
-      `	onClick?: () => void;`,
-      `}`,
-      ``,
-      `/** A tiny example component \u2014 replace me. */`,
-      `export function Button({ label, onClick }: ButtonProps) {`,
-      `	return <button onClick={onClick}>{label}</button>;`,
-      `}`,
-      ``
-    ].join("\n");
-  }
-  return [
-    `/**`,
-    ` * A tiny example component \u2014 replace me.`,
-    ` * @param {{ label: string, onClick?: () => void }} props`,
-    ` */`,
-    `export function Button({ label, onClick }) {`,
-    `	return <button onClick={onClick}>{label}</button>;`,
-    `}`,
-    ``
-  ].join("\n");
+function run(cfg, script) {
+  return cfg.packageManager === "npm" ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
 }
 function readme(cfg) {
   const install = {
@@ -395,14 +391,37 @@ function readme(cfg) {
     "```",
     ""
   ];
-  if (cfg.hasLibrary && cfg.isReact) {
+  if (cfg.hasApp) {
+    lines.push("## Develop", "", "```sh", run(cfg, "dev") + "     # start the dev server", run(cfg, "build") + "   # production build", "```", "");
+  } else if (cfg.hasLibrary && cfg.isReact) {
     lines.push(
       "## Usage",
       "",
       "```" + (cfg.isTs ? "tsx" : "jsx"),
       `import { Button } from '${cfg.name}';`,
       "",
-      `<Button label="Click me" onClick={() => alert('hi')} />`,
+      `<Button label="Click me" />`,
+      "```",
+      ""
+    );
+  } else if (cfg.hasLibrary && cfg.isVue) {
+    lines.push(
+      "## Usage",
+      "",
+      "```" + (cfg.isTs ? "ts" : "js"),
+      `import { Button } from '${cfg.name}';`,
+      '// then <Button label="Click me" /> in your template',
+      "```",
+      ""
+    );
+  } else if (cfg.hasLibrary && cfg.isSvelte) {
+    lines.push(
+      "## Usage",
+      "",
+      "```svelte",
+      `<script>import { Button } from '${cfg.name}';<\/script>`,
+      "",
+      `<Button label="Click me" />`,
       "```",
       ""
     );
@@ -420,7 +439,8 @@ function readme(cfg) {
 // src/core/features/bundler.js
 var bundler_default = {
   id: "bundler",
-  active: () => true,
+  active: (cfg) => !cfg.customBuild,
+  // Vite / Svelte-lib own their own build wiring
   apply(cfg) {
     const files = {};
     const pkg = { scripts: {} };
@@ -532,19 +552,20 @@ var typescript_default = {
   id: "typescript",
   active: (cfg) => cfg.isTs,
   apply(cfg) {
-    const noBuild = cfg.bundler === "none";
+    const noBuild = cfg.bundler === "none" && !cfg.customBuild;
+    const webLibs = cfg.hasFramework || cfg.hasApp;
     const compilerOptions = {
       target: "ES2022",
       module: "ESNext",
       moduleResolution: "Bundler",
-      lib: cfg.isReact ? ["ES2022", "DOM", "DOM.Iterable"] : ["ES2022"],
+      lib: webLibs ? ["ES2022", "DOM", "DOM.Iterable"] : ["ES2022"],
       ...cfg.isReact ? { jsx: "react-jsx" } : {},
       strict: true,
       noUncheckedIndexedAccess: true,
       esModuleInterop: true,
       skipLibCheck: true,
       forceConsistentCasingInFileNames: true,
-      verbatimModuleSyntax: cfg.bundler !== "none",
+      verbatimModuleSyntax: cfg.bundler !== "none" && !cfg.hasFramework,
       declaration: true
     };
     if (noBuild) {
@@ -574,26 +595,202 @@ var typescript_default = {
   }
 };
 
-// src/core/features/react.js
-var react_default = {
-  id: "react",
-  active: (cfg) => cfg.isReact,
+// src/core/features/frameworks.js
+var frameworks_default = {
+  id: "frameworks",
+  active: (cfg) => cfg.hasFramework,
   apply(cfg) {
-    const pkg = {
-      peerDependencies: {
-        react: ">=18",
-        "react-dom": ">=18"
-      },
-      devDependencies: {
-        react: "^18.3.0",
-        "react-dom": "^18.3.0"
-      }
-    };
-    if (cfg.isTs) {
-      pkg.devDependencies["@types/react"] = "^18.3.0";
-      pkg.devDependencies["@types/react-dom"] = "^18.3.0";
+    const files = {};
+    const pkg = { devDependencies: {}, scripts: {} };
+    const forApp = cfg.hasApp;
+    if (cfg.isReact) react(cfg, files, pkg, forApp);
+    else if (cfg.isVue) vue(cfg, files, pkg, forApp);
+    else if (cfg.isSvelte) svelte(cfg, files, pkg, forApp);
+    return { files, pkg };
+  }
+};
+function react(cfg, files, pkg, forApp) {
+  const x = cfg.isTs ? "tsx" : "jsx";
+  if (forApp) {
+    files["index.html"] = htmlShell(cfg, `/src/main.${x}`);
+    files[`src/main.${x}`] = [
+      `import { StrictMode } from 'react';`,
+      `import { createRoot } from 'react-dom/client';`,
+      `import { App } from './App.${x === "tsx" ? "js" : "js"}';`,
+      ``,
+      `createRoot(document.getElementById('root')${cfg.isTs ? "!" : ""}).render(`,
+      `	<StrictMode><App /></StrictMode>,`,
+      `);`,
+      ``
+    ].join("\n");
+    files[`src/App.${x}`] = [
+      `export function App() {`,
+      `	return <h1>Hello from ${cfg.name}</h1>;`,
+      `}`,
+      ``
+    ].join("\n");
+    pkg.dependencies = { react: "^18.3.0", "react-dom": "^18.3.0" };
+  } else {
+    files[`src/index.${x}`] = cfg.isTs ? [
+      `export interface ButtonProps {`,
+      `	label: string;`,
+      `	onClick?: () => void;`,
+      `}`,
+      ``,
+      `export function Button({ label, onClick }: ButtonProps) {`,
+      `	return <button onClick={onClick}>{label}</button>;`,
+      `}`,
+      ``
+    ].join("\n") : [`export function Button({ label, onClick }) {`, `	return <button onClick={onClick}>{label}</button>;`, `}`, ``].join("\n");
+    pkg.peerDependencies = { react: ">=18", "react-dom": ">=18" };
+    pkg.devDependencies.react = "^18.3.0";
+    pkg.devDependencies["react-dom"] = "^18.3.0";
+  }
+  if (cfg.isTs) {
+    pkg.devDependencies["@types/react"] = "^18.3.0";
+    pkg.devDependencies["@types/react-dom"] = "^18.3.0";
+  }
+}
+function vue(cfg, files, pkg, forApp) {
+  const script = cfg.isTs ? `<script setup lang="ts">` : `<script setup>`;
+  if (forApp) {
+    files["index.html"] = htmlShell(cfg, `/src/main.${cfg.ext}`);
+    files[`src/main.${cfg.ext}`] = [
+      `import { createApp } from 'vue';`,
+      `import App from './App.vue';`,
+      ``,
+      `createApp(App).mount('#root');`,
+      ``
+    ].join("\n");
+    files["src/App.vue"] = [script, `<\/script>`, ``, `<template>`, `	<h1>Hello from ${cfg.name}</h1>`, `</template>`, ``].join("\n");
+    pkg.dependencies = { vue: "^3.4.0" };
+  } else {
+    files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.vue';
+`;
+    files["src/Button.vue"] = [
+      script,
+      `defineProps${cfg.isTs ? "<{ label: string }>()" : "(['label'])"};`,
+      `<\/script>`,
+      ``,
+      `<template>`,
+      `	<button><slot>{{ label }}</slot></button>`,
+      `</template>`,
+      ``
+    ].join("\n");
+    pkg.peerDependencies = { vue: ">=3" };
+    pkg.devDependencies.vue = "^3.4.0";
+  }
+}
+function svelte(cfg, files, pkg, forApp) {
+  const script = cfg.isTs ? `<script lang="ts">` : `<script>`;
+  files["svelte.config.js"] = `import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+export default { preprocess: vitePreprocess() };
+`;
+  pkg.devDependencies["@sveltejs/vite-plugin-svelte"] = "^4.0.0";
+  if (cfg.isTs) pkg.devDependencies["svelte-check"] = "^4.0.0";
+  if (forApp) {
+    files["index.html"] = htmlShell(cfg, `/src/main.${cfg.ext}`);
+    files[`src/main.${cfg.ext}`] = [
+      `import { mount } from 'svelte';`,
+      `import App from './App.svelte';`,
+      ``,
+      `const app = mount(App, { target: document.getElementById('root')${cfg.isTs ? "!" : ""} });`,
+      `export default app;`,
+      ``
+    ].join("\n");
+    files["src/App.svelte"] = [script, `<\/script>`, ``, `<h1>Hello from ${cfg.name}</h1>`, ``].join("\n");
+    pkg.dependencies = { svelte: "^5.0.0" };
+  } else {
+    files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.svelte';
+`;
+    files["src/Button.svelte"] = [
+      script,
+      cfg.isTs ? `	interface Props { label: string; }` : ``,
+      cfg.isTs ? `	const { label }: Props = $props();` : `	const { label } = $props();`,
+      `<\/script>`,
+      ``,
+      `<button>{label}</button>`,
+      ``
+    ].filter((l) => l !== ``).join("\n") + "\n";
+    pkg.peerDependencies = { svelte: ">=5" };
+    pkg.devDependencies.svelte = "^5.0.0";
+    pkg.svelte = `./src/index.${cfg.ext}`;
+    pkg.exports = { ".": { svelte: `./src/index.${cfg.ext}`, default: `./src/index.${cfg.ext}` } };
+    pkg.files = ["src"];
+    pkg.type = "module";
+  }
+}
+function htmlShell(cfg, entry) {
+  return [
+    `<!doctype html>`,
+    `<html lang="en">`,
+    `	<head>`,
+    `		<meta charset="UTF-8" />`,
+    `		<meta name="viewport" content="width=device-width, initial-scale=1.0" />`,
+    `		<title>${cfg.name}</title>`,
+    `	</head>`,
+    `	<body>`,
+    `		<div id="root"></div>`,
+    `		<script type="module" src="${entry}"><\/script>`,
+    `	</body>`,
+    `</html>`,
+    ``
+  ].join("\n");
+}
+
+// src/core/features/vite.js
+var PLUGIN = {
+  react: { import: `import react from '@vitejs/plugin-react';`, call: "react()", dep: { "@vitejs/plugin-react": "^4.3.0" } },
+  vue: { import: `import vue from '@vitejs/plugin-vue';`, call: "vue()", dep: { "@vitejs/plugin-vue": "^5.1.0" } },
+  svelte: { import: `import { svelte } from '@sveltejs/vite-plugin-svelte';`, call: "svelte()", dep: { "@sveltejs/vite-plugin-svelte": "^4.0.0" } }
+};
+var vite_default = {
+  id: "vite",
+  active: (cfg) => cfg.viteBuild,
+  apply(cfg) {
+    const files = {};
+    const pkg = { scripts: {}, devDependencies: { vite: "^5.4.0" } };
+    const p = PLUGIN[cfg.framework];
+    Object.assign(pkg.devDependencies, p.dep);
+    if (cfg.isVue && cfg.isTs) pkg.devDependencies["vue-tsc"] = "^2.0.0";
+    if (cfg.hasApp) {
+      files[`vite.config.${cfg.ext}`] = [p.import, ``, `import { defineConfig } from 'vite';`, ``, `export default defineConfig({`, `	plugins: [${p.call}],`, `});`, ``].join("\n");
+      pkg.private = true;
+      pkg.scripts.dev = "vite";
+      const precheck = cfg.isTs && cfg.isReact ? "tsc --noEmit && " : cfg.isTs && cfg.isVue ? "vue-tsc --noEmit && " : "";
+      pkg.scripts.build = precheck + "vite build";
+      pkg.scripts.preview = "vite preview";
+    } else {
+      files[`vite.config.${cfg.ext}`] = [
+        p.import,
+        `import dts from 'vite-plugin-dts';`,
+        ``,
+        `import { defineConfig } from 'vite';`,
+        ``,
+        `export default defineConfig({`,
+        `	plugins: [${p.call}, dts({ rollupTypes: true })],`,
+        `	build: {`,
+        `		lib: { entry: 'src/index.${cfg.ext}', formats: ['es', 'cjs'], fileName: (f) => (f === 'es' ? 'index.js' : 'index.cjs') },`,
+        `		rollupOptions: { external: ['vue'] },`,
+        `	},`,
+        `});`,
+        ``
+      ].join("\n");
+      pkg.scripts.build = "vite build";
+      pkg.scripts.dev = "vite build --watch";
+      pkg.devDependencies["vite-plugin-dts"] = "^4.0.0";
+      if (cfg.isVue) pkg.devDependencies["vue-tsc"] = "^2.0.0";
+      pkg.files = ["dist"];
+      pkg.type = "module";
+      pkg.main = "./dist/index.cjs";
+      pkg.module = "./dist/index.js";
+      pkg.types = "./dist/index.d.ts";
+      pkg.exports = { ".": { types: "./dist/index.d.ts", import: "./dist/index.js", require: "./dist/index.cjs" } };
     }
-    return { files: {}, pkg };
+    pkg.scripts.clean = "rimraf dist";
+    pkg.devDependencies.rimraf = "^6.0.0";
+    return { files, pkg };
   }
 };
 
@@ -682,13 +879,20 @@ var test_default = {
     const ext = cfg.ext;
     const testExt = cfg.isReact ? cfg.srcExt : ext;
     if (cfg.test === "vitest") {
+      const fw = cfg.isVue ? { imp: `import vue from '@vitejs/plugin-vue';`, call: "vue()" } : cfg.isSvelte ? {
+        imp: `import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelteTesting } from '@testing-library/svelte/vite';`,
+        call: "svelte(), svelteTesting()"
+      } : null;
       files[`vitest.config.${ext}`] = [
+        fw ? fw.imp : null,
         `import { defineConfig } from 'vitest/config';`,
         ``,
         `export default defineConfig({`,
+        fw ? `	plugins: [${fw.call}],` : null,
         `	test: {`,
-        cfg.isReact ? `		environment: 'jsdom',` : null,
-        cfg.isReact ? `		globals: true,` : null,
+        cfg.hasFramework ? `		environment: 'jsdom',` : null,
+        cfg.hasFramework ? `		globals: true,` : null,
         cfg.coverage ? `		coverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,
         `	},`,
         `});`,
@@ -697,10 +901,12 @@ var test_default = {
       pkg.scripts.test = "vitest run";
       pkg.scripts["test:watch"] = "vitest";
       pkg.devDependencies.vitest = "^2.0.0";
-      if (cfg.isReact) {
+      if (cfg.hasFramework) {
         pkg.devDependencies.jsdom = "^25.0.0";
-        pkg.devDependencies["@testing-library/react"] = "^16.0.0";
         pkg.devDependencies["@testing-library/dom"] = "^10.0.0";
+        if (cfg.isReact) pkg.devDependencies["@testing-library/react"] = "^16.0.0";
+        if (cfg.isVue) pkg.devDependencies["@testing-library/vue"] = "^8.1.0";
+        if (cfg.isSvelte) pkg.devDependencies["@testing-library/svelte"] = "^5.2.0";
       }
       if (cfg.coverage) {
         pkg.scripts.coverage = "vitest run --coverage";
@@ -748,17 +954,33 @@ function exampleTest(runner, cfg) {
       ``
     ].join("\n");
   }
-  if (cfg.isReact) {
+  if (cfg.hasFramework) {
     const api2 = runner === "jest" ? "" : `import { describe, it, expect } from 'vitest';
 `;
+    const app = cfg.hasApp;
+    const label = app ? "/Hello from/" : `'Click me'`;
+    let lib, importLine, renderCall;
+    if (cfg.isReact) {
+      lib = "@testing-library/react";
+      importLine = app ? `import { App } from './App.js';` : `import { Button } from './index.js';`;
+      renderCall = app ? `render(<App />)` : `render(<Button label="Click me" />)`;
+    } else if (cfg.isVue) {
+      lib = "@testing-library/vue";
+      importLine = app ? `import App from './App.vue';` : `import { Button } from './index.js';`;
+      renderCall = app ? `render(App)` : `render(Button, { props: { label: 'Click me' } })`;
+    } else {
+      lib = "@testing-library/svelte";
+      importLine = app ? `import App from './App.svelte';` : `import Button from './Button.svelte';`;
+      renderCall = app ? `render(App)` : `render(Button, { props: { label: 'Click me' } })`;
+    }
     return [
-      api2 + `import { render, screen } from '@testing-library/react';`,
-      `import { Button } from '${imp}';`,
+      api2 + `import { render, screen } from '${lib}';`,
+      importLine,
       ``,
-      `describe('Button', () => {`,
-      `	it('renders its label', () => {`,
-      `		render(<Button label="Click me" />);`,
-      `		expect(screen.getByText('Click me')).toBeDefined();`,
+      `describe('${app ? "App" : "Button"}', () => {`,
+      `	it('renders', () => {`,
+      `		${renderCall};`,
+      `		expect(screen.getByText(${label})).toBeDefined();`,
       `	});`,
       `});`,
       ``
@@ -961,7 +1183,7 @@ var release_default = {
   }
 };
 function buildThen(cfg) {
-  return cfg.bundler !== "none" || cfg.isTs ? "npm run build && " : "";
+  return cfg.hasBuild ? "npm run build && " : "";
 }
 
 // src/core/features/cli.js
@@ -1063,7 +1285,7 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, "typecheck")}`);
   if (cfg.lint !== "none") jobs.push(`      - run: ${pmRun(cfg, "lint")}`);
   if (cfg.test !== "none") jobs.push(`      - run: ${pmRun(cfg, codecov ? "coverage" : "test")}`);
-  if (cfg.bundler !== "none" || cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, "build")}`);
+  if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, "build")}`);
   const cov = codecov ? "\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}" : "";
   return [
     "name: CI",
@@ -1118,7 +1340,7 @@ function releaseWorkflow(cfg) {
     "  publish:",
     "    runs-on: ubuntu-latest",
     setupSteps(cfg),
-    cfg.bundler !== "none" || cfg.isTs ? `      - run: ${pmRun(cfg, "build")}` : null,
+    cfg.hasBuild ? `      - run: ${pmRun(cfg, "build")}` : null,
     "      - run: npm publish --provenance --access public",
     "        env:",
     "          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}",
@@ -1196,6 +1418,87 @@ function staleWorkflow() {
     "          days-before-stale: 60",
     "          days-before-close: 7",
     ""
+  ].join("\n");
+}
+
+// src/core/features/storybook.js
+var FW = {
+  react: { builder: "@storybook/react-vite", renderer: "@storybook/react", storyExt: "tsx" },
+  vue: { builder: "@storybook/vue3-vite", renderer: "@storybook/vue3", storyExt: "ts" },
+  svelte: { builder: "@storybook/svelte-vite", renderer: "@storybook/svelte", storyExt: "ts" }
+};
+var storybook_default = {
+  id: "storybook",
+  active: (cfg) => cfg.storybook,
+  apply(cfg) {
+    const fw = FW[cfg.framework];
+    const files = {};
+    files[".storybook/main.ts"] = [
+      `import type { StorybookConfig } from '${fw.builder}';`,
+      ``,
+      `const config: StorybookConfig = {`,
+      `	stories: ['../src/**/*.stories.@(ts|tsx|svelte)'],`,
+      `	addons: ['@storybook/addon-essentials'],`,
+      `	framework: '${fw.builder}',`,
+      `};`,
+      `export default config;`,
+      ``
+    ].join("\n");
+    files[".storybook/preview.ts"] = `export default { parameters: {} };
+`;
+    files[`src/Button.stories.${fw.storyExt}`] = story(cfg, fw);
+    return {
+      files,
+      pkg: {
+        scripts: {
+          storybook: "storybook dev -p 6006",
+          "build-storybook": "storybook build"
+        },
+        devDependencies: {
+          storybook: "^8.2.0",
+          [fw.builder]: "^8.2.0",
+          [fw.renderer]: "^8.2.0",
+          "@storybook/addon-essentials": "^8.2.0",
+          vite: "^5.4.0"
+        }
+      }
+    };
+  }
+};
+function story(cfg, fw) {
+  if (cfg.isReact) {
+    return [
+      `import type { Meta, StoryObj } from '${fw.renderer}';`,
+      `import { Button } from './index';`,
+      ``,
+      `const meta: Meta<typeof Button> = { component: Button };`,
+      `export default meta;`,
+      ``,
+      `export const Default: StoryObj<typeof Button> = { args: { label: 'Click me' } };`,
+      ``
+    ].join("\n");
+  }
+  if (cfg.isVue) {
+    return [
+      `import type { Meta, StoryObj } from '${fw.renderer}';`,
+      `import { Button } from './index';`,
+      ``,
+      `const meta = { component: Button } satisfies Meta<typeof Button>;`,
+      `export default meta;`,
+      ``,
+      `export const Default: StoryObj<typeof meta> = { args: { label: 'Click me' } };`,
+      ``
+    ].join("\n");
+  }
+  return [
+    `import type { Meta, StoryObj } from '${fw.renderer}';`,
+    `import Button from './Button.svelte';`,
+    ``,
+    `const meta = { component: Button } satisfies Meta<Button>;`,
+    `export default meta;`,
+    ``,
+    `export const Default: StoryObj<typeof meta> = { args: { label: 'Click me' } };`,
+    ``
   ].join("\n");
 }
 
@@ -1369,13 +1672,13 @@ var agents_default = {
   id: "agents",
   active: (cfg) => cfg.agents,
   apply(cfg) {
-    const run = (s) => cfg.packageManager === "npm" ? `npm run ${s}` : `${cfg.packageManager} ${s}`;
+    const run2 = (s) => cfg.packageManager === "npm" ? `npm run ${s}` : `${cfg.packageManager} ${s}`;
     const test = cfg.packageManager === "npm" ? "npm test" : `${cfg.packageManager} test`;
     const commands = [];
-    if (cfg.isTs) commands.push(`- Type-check: \`${run("typecheck")}\``);
-    if (cfg.lint !== "none") commands.push(`- Lint: \`${run("lint")}\``);
+    if (cfg.isTs) commands.push(`- Type-check: \`${run2("typecheck")}\``);
+    if (cfg.lint !== "none") commands.push(`- Lint: \`${run2("lint")}\``);
     if (cfg.test !== "none") commands.push(`- Test: \`${test}\``);
-    if (cfg.bundler !== "none" || cfg.isTs) commands.push(`- Build: \`${run("build")}\``);
+    if (cfg.hasBuild) commands.push(`- Build: \`${run2("build")}\``);
     const stack = [
       `- Language: ${cfg.isTs ? "TypeScript (strict)" : "JavaScript (ESM)"}`,
       `- Module format: ${cfg.moduleFormat.toUpperCase()}`,
@@ -1501,7 +1804,8 @@ var features_default = [
   meta_default,
   bundler_default,
   typescript_default,
-  react_default,
+  frameworks_default,
+  vite_default,
   service_default,
   test_default,
   lint_default,
@@ -1509,6 +1813,7 @@ var features_default = [
   release_default,
   cli_default,
   workflows_default,
+  storybook_default,
   community_default,
   agents_default,
   vscode_default,
@@ -1523,6 +1828,9 @@ var PRESETS = {
   cli: { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
   "react-lib": { language: "ts", framework: "react", target: ["library"], moduleFormat: "dual", test: "vitest" },
   "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "dual", bundler: "tsup", test: "vitest" },
+  "react-app": { language: "ts", framework: "react", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
+  "vue-lib": { language: "ts", framework: "vue", target: ["library"], test: "vitest" },
+  "svelte-lib": { language: "ts", framework: "svelte", target: ["library"], test: "vitest" },
   "node-service": {
     language: "ts",
     target: ["service"],
@@ -1593,6 +1901,9 @@ var PRESET_INFO = {
   cli: "TypeScript CLI tool \u2014 ESM, ships a bin.",
   "react-lib": "React component library (TS) \u2014 JSX, peer deps, jsdom tests.",
   "react-lib-js": "React component library (JS) \u2014 JSX, peer deps, jsdom tests.",
+  "react-app": "React SPA \u2014 Vite dev server, build, Testing Library.",
+  "vue-lib": "Vue component library \u2014 Vite lib build (SFCs), dual + types.",
+  "svelte-lib": "Svelte component library \u2014 ships source, peer svelte, jsdom tests.",
   "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
   oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
   minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",

@@ -101,6 +101,7 @@ function commandFor(cfg) {
   if (diff('target')) cfg.target.forEach((t) => parts.push(`--target ${t}`));
   if (diff('workflows')) cfg.workflows.forEach((w) => parts.push(`--workflows ${w}`));
   if (cfg.minify) parts.push('--minify');
+  if (cfg.storybook) parts.push('--storybook');
   if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
   for (const b of ['community', 'agents', 'vscode', 'editorconfig']) {
     if (cfg[b] === false && d[b] === true) parts.push(`--no-${b}`);

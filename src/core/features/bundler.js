@@ -3,7 +3,7 @@
 
 export default {
   id: 'bundler',
-  active: () => true,
+  active: (cfg) => !cfg.customBuild, // Vite / Svelte-lib own their own build wiring
   apply(cfg) {
     const files = {};
     const pkg = { scripts: {} };

@@ -33,8 +33,8 @@ Options:
   --no-install        Skip dependency install
   --no-git            Skip git init
   --pm <manager>      npm | pnpm | yarn | bun
-  --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react>
-  --target <library|cli|service>   (repeatable)
+  --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react|vue|svelte>
+  --target <library|cli|service|app>   (repeatable)   --storybook
   --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
   --test <vitest|jest|node|none>  --lint <eslint-prettier|biome|oxlint|none>
   --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
@@ -98,8 +98,8 @@ export async function run(argv = process.argv.slice(2)) {
   const next = [
     args.here ? null : `cd ${rel}`,
     config.install ? null : `${config.packageManager} install`,
-    summary.stack.includes('tsup') || summary.stack.includes('tsdown') ? `${runWord(config)} build` : null,
-    summary.stack.some((s) => ['vitest', 'jest'].includes(s)) ? `${runWord(config)} test` : null,
+    config.hasApp ? `${runWord(config)} dev` : config.hasBuild ? `${runWord(config)} build` : null,
+    config.test !== 'none' ? `${runWord(config)} test` : null,
   ].filter(Boolean);
 
   const done = `Created ${summary.name} — ${summary.fileCount} files · ${summary.stack.join(' · ')}`;

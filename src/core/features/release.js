@@ -40,5 +40,5 @@ export default {
 };
 
 function buildThen(cfg) {
-  return cfg.bundler !== 'none' || cfg.isTs ? 'npm run build && ' : '';
+  return cfg.hasBuild ? 'npm run build && ' : '';
 }
