@@ -30,4 +30,13 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - More service frameworks (Fastify/Express) alongside Hono
 - Postinstall doctor: check Node/pm versions match `engines`
 
-<!-- Items added from real-world demand / gaps get appended here. -->
+## From real-world demand (2026 research)
+The current "is my package correct?" and publishing best-practices that a serious library scaffolder should offer:
+
+- [ ] **Package-correctness checks** — optional `publint` + `@arethetypeswrong/cli --pack` step (in CI and/or `prepublishOnly`). These catch broken `exports`/`main`/`module` and mis-resolved `.d.ts` that npm itself doesn't. *(High value, low effort — the 2026 standard.)*
+- [ ] **JSR publishing** — TypeScript-first, ESM-only registry with automatic Sigstore provenance and no build-step requirement. Add `jsr.json` + a publish workflow as an alternative/companion to npm. *(Emerging demand.)*
+- [ ] **Knip** — unused files/dependencies/exports detection before publish (as create-typescript-app does).
+- [ ] **Monorepo target** — pnpm/turbo workspaces + Changesets; the battle-tested 2026 stack. Guardrail: only worth it with ≥2 packages sharing code.
+- [ ] **ESM-only guidance** — surface "ESM-only" as the recommended default for new libraries (Node 23+ can `require()` ESM), while keeping dual as an option.
+- [ ] **`size-limit`** — bundle-size budget check for libraries.
+
