@@ -110,8 +110,37 @@ export async function run(argv = process.argv.slice(2)) {
     console.log(done);
     if (next.length) console.log('\nNext steps:\n  ' + next.join('\n  '));
   }
+
+  const latest = await checkForUpdate(pkgVersion());
+  if (latest) console.log(`\n↑ A newer create-packkit is available: ${latest} (you have ${pkgVersion()}). Use @latest to update.`);
 }
 
 function runWord(config) {
   return config.packageManager === 'npm' ? 'npm run' : config.packageManager;
+}
+
+// Best-effort update check — TTY only, short timeout, never throws or blocks.
+async function checkForUpdate(current) {
+  try {
+    if (process.env.CI || process.env.NO_UPDATE_NOTIFIER || !process.stdout.isTTY) return null;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch('https://registry.npmjs.org/create-packkit/latest', { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const { version } = await res.json();
+    return version && isNewer(version, current) ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+function isNewer(latest, current) {
+  const a = latest.split('.').map(Number);
+  const b = current.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) > (b[i] || 0)) return true;
+    if ((a[i] || 0) < (b[i] || 0)) return false;
+  }
+  return false;
 }

@@ -57,6 +57,22 @@ test('storybook: config + story + deps for a react library', () => {
   assert.equal(generate(fromPreset('ts-lib', { name: 's', storybook: true })).config.storybook, false);
 });
 
+test('vue-app / svelte-app: private Vite SPAs', () => {
+  for (const p of ['vue-app', 'svelte-app']) {
+    const out = generate(fromPreset(p, { name: p }));
+    assert.ok(out.files['index.html'], `${p} index.html`);
+    assert.ok(out.files['vite.config.ts'], `${p} vite config`);
+    assert.equal(JSON.parse(out.files['package.json']).private, true, `${p} private`);
+  }
+});
+
+test('storybook + pages workflow deploys the built catalog', () => {
+  const out = generate(fromPreset('react-lib', { name: 's', storybook: true, workflows: ['ci', 'pages'] }));
+  const wf = out.files['.github/workflows/pages.yml'];
+  assert.match(wf, /build-storybook/);
+  assert.match(wf, /storybook-static/);
+});
+
 test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });

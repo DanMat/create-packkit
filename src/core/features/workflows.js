@@ -140,8 +140,12 @@ function releaseWorkflow(cfg) {
 }
 
 function pagesWorkflow(cfg) {
+  // Storybook projects deploy the built catalog; everything else serves ./docs.
+  const build = cfg.storybook
+    ? [setupSteps(cfg), `      - run: ${pmRun(cfg, 'build-storybook')}`, '      - uses: actions/configure-pages@v5', '      - uses: actions/upload-pages-artifact@v3', '        with:', '          path: ./storybook-static']
+    : ['      - uses: actions/checkout@v4', '      - uses: actions/configure-pages@v5', '      - uses: actions/upload-pages-artifact@v3', '        with:', '          path: ./docs'];
   return [
-    'name: Deploy Pages',
+    `name: Deploy ${cfg.storybook ? 'Storybook' : 'Pages'}`,
     'on:',
     '  push:',
     '    branches: [main]',
@@ -159,11 +163,7 @@ function pagesWorkflow(cfg) {
     '      url: ${{ steps.deployment.outputs.page_url }}',
     '    runs-on: ubuntu-latest',
     '    steps:',
-    '      - uses: actions/checkout@v4',
-    '      - uses: actions/configure-pages@v5',
-    '      - uses: actions/upload-pages-artifact@v3',
-    '        with:',
-    '          path: ./docs',
+    build.join('\n'),
     '      - id: deployment',
     '        uses: actions/deploy-pages@v4',
     '',

@@ -17,8 +17,10 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [x] ~~Storybook option for React component libraries.~~ **Shipped** (React/Vue/Svelte, Vite builder).
 - [x] ~~More frameworks — Vue and Svelte component libraries.~~ **Shipped.**
 - [x] ~~React app target — a Vite SPA starter.~~ **Shipped** (React/Vue/Svelte apps).
+- [x] ~~Storybook Pages deploy — publish `storybook-static` to GitHub Pages.~~ **Shipped** (the `pages` workflow auto-adapts for Storybook projects).
+- [x] ~~Vue/Svelte app presets.~~ **Shipped** (`vue-app`, `svelte-app`).
+- [x] ~~Update notifier.~~ **Shipped** (best-effort, TTY-only).
 - [ ] **Defaults refresh** — consider `tsdown` and `Biome` as recommended defaults as they stabilize.
-- [ ] **Storybook Pages deploy** — a workflow to publish `storybook-static` to GitHub Pages.
 - [ ] **Monorepo target** — pnpm/turbo workspaces with multiple packages.
 - [x] ~~Node service preset — Hono service with Dockerfile + CI.~~ **Shipped.**
 - [x] ~~Full CLI flag parity.~~ **Shipped.**

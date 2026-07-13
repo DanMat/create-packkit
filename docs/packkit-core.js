@@ -1348,8 +1348,9 @@ function releaseWorkflow(cfg) {
   ].filter((l) => l !== null).join("\n");
 }
 function pagesWorkflow(cfg) {
+  const build = cfg.storybook ? [setupSteps(cfg), `      - run: ${pmRun(cfg, "build-storybook")}`, "      - uses: actions/configure-pages@v5", "      - uses: actions/upload-pages-artifact@v3", "        with:", "          path: ./storybook-static"] : ["      - uses: actions/checkout@v4", "      - uses: actions/configure-pages@v5", "      - uses: actions/upload-pages-artifact@v3", "        with:", "          path: ./docs"];
   return [
-    "name: Deploy Pages",
+    `name: Deploy ${cfg.storybook ? "Storybook" : "Pages"}`,
     "on:",
     "  push:",
     "    branches: [main]",
@@ -1367,11 +1368,7 @@ function pagesWorkflow(cfg) {
     "      url: ${{ steps.deployment.outputs.page_url }}",
     "    runs-on: ubuntu-latest",
     "    steps:",
-    "      - uses: actions/checkout@v4",
-    "      - uses: actions/configure-pages@v5",
-    "      - uses: actions/upload-pages-artifact@v3",
-    "        with:",
-    "          path: ./docs",
+    build.join("\n"),
     "      - id: deployment",
     "        uses: actions/deploy-pages@v4",
     ""
@@ -1830,7 +1827,9 @@ var PRESETS = {
   "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "dual", bundler: "tsup", test: "vitest" },
   "react-app": { language: "ts", framework: "react", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
   "vue-lib": { language: "ts", framework: "vue", target: ["library"], test: "vitest" },
+  "vue-app": { language: "ts", framework: "vue", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
   "svelte-lib": { language: "ts", framework: "svelte", target: ["library"], test: "vitest" },
+  "svelte-app": { language: "ts", framework: "svelte", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
   "node-service": {
     language: "ts",
     target: ["service"],
@@ -1903,7 +1902,9 @@ var PRESET_INFO = {
   "react-lib-js": "React component library (JS) \u2014 JSX, peer deps, jsdom tests.",
   "react-app": "React SPA \u2014 Vite dev server, build, Testing Library.",
   "vue-lib": "Vue component library \u2014 Vite lib build (SFCs), dual + types.",
+  "vue-app": "Vue SPA \u2014 Vite dev server, build, Testing Library.",
   "svelte-lib": "Svelte component library \u2014 ships source, peer svelte, jsdom tests.",
+  "svelte-app": "Svelte SPA \u2014 Vite dev server, build, Testing Library.",
   "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
   oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
   minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",

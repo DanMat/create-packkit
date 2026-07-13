@@ -49,7 +49,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 
 ## Presets
 
-`ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `react-app` · `vue-lib` · `svelte-lib` · `node-service` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
+`ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `react-app` · `vue-lib` · `vue-app` · `svelte-lib` · `svelte-app` · `node-service` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
 
 ## How it works
 
