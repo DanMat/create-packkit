@@ -4,8 +4,7 @@
   "description": "Highly configurable scaffolder for modern npm packages and CLIs — pick your stack (TS/JS, bundler, tests, linter, CI, releases) from a CLI or a web configurator.",
   "type": "module",
   "bin": {
-    "create-packkit": "bin/cli.js",
-    "packkit": "bin/cli.js"
+    "create-packkit": "bin/cli.js"
   },
   "exports": {
     ".": "./src/core/index.js",
