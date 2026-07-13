@@ -51,6 +51,8 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 
 `ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `react-app` · `vue-lib` · `vue-app` · `svelte-lib` · `svelte-app` · `node-service` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
 
+**Team profiles:** save a partial config as `packkit.config.json` (or any file) and reuse it with `npx create-packkit my-lib --from ./packkit.config.json` — flags still override the file.
+
 ## How it works
 
 Packkit is a pure `config → { files }` **core** that runs in both Node and the browser:

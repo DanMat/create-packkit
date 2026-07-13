@@ -77,6 +77,23 @@ function run(cfg, script) {
   return cfg.packageManager === 'npm' ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
 }
 
+function makeBadges(cfg) {
+  const badges = [];
+  const publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
+  if (publishable) {
+    const enc = encodeURIComponent(cfg.name);
+    badges.push(`[![npm](https://img.shields.io/npm/v/${enc}.svg)](https://www.npmjs.com/package/${cfg.name})`);
+  }
+  const repo = cfg.repo ? cfg.repo.replace(/\.git$/, '') : '';
+  if (repo && (cfg.workflows || []).includes('ci')) {
+    badges.push(`[![CI](${repo}/actions/workflows/ci.yml/badge.svg)](${repo}/actions/workflows/ci.yml)`);
+  }
+  if (cfg.license !== 'none') {
+    badges.push(`[![License: ${cfg.license}](https://img.shields.io/badge/license-${encodeURIComponent(cfg.license)}-blue.svg)](LICENSE)`);
+  }
+  return badges.join(' ');
+}
+
 function readme(cfg) {
   const install = {
     npm: `npm install ${cfg.name}`,
@@ -90,13 +107,12 @@ function readme(cfg) {
     '',
     cfg.description || '_A modern package scaffolded with [Packkit](https://danmat.github.io/create-packkit/)._',
     '',
-    '## Install',
-    '',
-    '```sh',
-    install,
-    '```',
-    '',
   ];
+
+  const badges = makeBadges(cfg);
+  if (badges) lines.push(badges, '');
+
+  lines.push('## Install', '', '```sh', install, '```', '');
 
   if (cfg.hasApp) {
     lines.push('## Develop', '', '```sh', run(cfg, 'dev') + '     # start the dev server', run(cfg, 'build') + '   # production build', '```', '');

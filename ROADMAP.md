@@ -2,37 +2,32 @@
 
 Planned and considered features for Packkit. Not commitments — a backlog to pull from. PRs and 👍s welcome.
 
-## Shipped
-- Core `config → files` engine (Node + browser)
-- CLI wizard + presets + non-interactive flags
-- Web configurator with client-side zip download
-- Targets: **library**, **CLI**, **React component library**, **HTTP service (Hono)**
-- Optional **minify**; **full CLI-flag parity** (the web "copy command" reproduces any config); preset **tooltips + gists**
-- Bundlers: tsup, tsdown, unbuild, rollup, none · Tests: Vitest, Jest, node:test
-- Lint: ESLint+Prettier, Biome, oxlint · Hooks: simple-git-hooks, husky, lefthook
-- Release: Changesets, release-it, np · GitHub Actions: CI, npm publish (provenance), Pages, CodeQL, Codecov, stale
-- Renovate/Dependabot · community files · AGENTS.md + CLAUDE.md · VS Code
+## Shipped (1.0)
+- Core `config → files` engine (runs in Node **and** the browser)
+- CLI wizard + 17 presets + full non-interactive flag parity + `--from` profiles (`packkit.config.json`)
+- Web configurator: client-side zip download + reproducible `npx` command + preset gists
+- **Targets**: library · CLI · HTTP service (Hono) · app (Vite SPA)
+- **Frameworks**: React · Vue · Svelte — component libraries **and** apps
+- **Storybook** for component libraries (Vite builder) + optional Pages deploy of the catalog
+- Bundlers: tsup · tsdown · unbuild · rollup · Vite · none — optional **minify**
+- Tests: Vitest · Jest · node:test · Testing Library per framework
+- Lint: ESLint+Prettier · Biome · oxlint · Hooks: simple-git-hooks · husky · lefthook
+- Release: Changesets · release-it · np · GitHub Actions: CI · npm publish (provenance) · Pages · CodeQL · Codecov · stale
+- Renovate/Dependabot · community files · **AGENTS.md + CLAUDE.md** · VS Code · README badges · update notifier
+- Package managers: npm · pnpm · yarn · bun
+
+**On defaults:** we keep **tsup + ESLint/Prettier + Vitest + Changesets** as the conservative, best-supported defaults. `tsdown`, `Biome`, and `oxlint` are one click away for those who want them — we'll revisit the defaults as those tools' ecosystems mature.
 
 ## Next up
-- [x] ~~Storybook option for React component libraries.~~ **Shipped** (React/Vue/Svelte, Vite builder).
-- [x] ~~More frameworks — Vue and Svelte component libraries.~~ **Shipped.**
-- [x] ~~React app target — a Vite SPA starter.~~ **Shipped** (React/Vue/Svelte apps).
-- [x] ~~Storybook Pages deploy — publish `storybook-static` to GitHub Pages.~~ **Shipped** (the `pages` workflow auto-adapts for Storybook projects).
-- [x] ~~Vue/Svelte app presets.~~ **Shipped** (`vue-app`, `svelte-app`).
-- [x] ~~Update notifier.~~ **Shipped** (best-effort, TTY-only).
-- [ ] **Defaults refresh** — consider `tsdown` and `Biome` as recommended defaults as they stabilize.
 - [ ] **Monorepo target** — pnpm/turbo workspaces with multiple packages.
-- [x] ~~Node service preset — Hono service with Dockerfile + CI.~~ **Shipped.**
-- [x] ~~Full CLI flag parity.~~ **Shipped.**
-- [ ] **Config file** — read defaults from `packkit.config.json` / a saved profile.
-- [ ] **tsup entry globbing** and multiple entry points.
-- [ ] **`npm create packkit` update check** — nudge when a newer version exists.
-
-## Presets
-Current: `ts-lib`, `js-lib`, `ts-cli`, `cli`, `react-lib`, `react-lib-js`, `oss`, `minimal`, `full`.
-Ideas: `vue-lib`, `svelte-lib`, `monorepo`, `node-service`.
+- [ ] **Vue/Svelte app scaffolds with a router** (currently minimal SPAs).
+- [ ] **Multiple entry points** — `exports` subpaths and per-entry builds.
+- [ ] **E2E option** — Playwright for apps.
 
 ## Ideas / maybe
-- Interactive web "diff against my repo" mode
-- Import an existing package.json to pre-fill the configurator
-- Badges block generator for the README
+- Import an existing `package.json` to pre-fill the web configurator
+- Save/share a config as a URL (encode the selection in the query string)
+- More service frameworks (Fastify/Express) alongside Hono
+- Postinstall doctor: check Node/pm versions match `engines`
+
+<!-- Items added from real-world demand / gaps get appended here. -->

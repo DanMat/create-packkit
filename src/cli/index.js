@@ -1,5 +1,5 @@
 import { resolve, basename } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import { generate, fromPreset, normalizeConfig, PRESET_NAMES } from '../core/index.js';
@@ -27,6 +27,7 @@ Presets: ${PRESET_NAMES.join(', ')}
 
 Options:
   --preset <name>     Use a preset (skips the wizard)
+  --from <file>       Load defaults from a JSON profile (or packkit.config.json)
   --name <name>       Package name
   --here              Scaffold into the current directory
   -y, --yes           Accept defaults / preset, no prompts
@@ -55,16 +56,20 @@ export async function run(argv = process.argv.slice(2)) {
   if (args.help) return void console.log(HELP);
   if (args.version) return void console.log(pkgVersion());
 
-  const interactive = !args.preset && !args.yes && process.stdout.isTTY;
+  const interactive = !args.preset && !args.yes && !args.from && process.stdout.isTTY;
+
+  // Precedence: preset < profile file < CLI flags.
+  const profile = loadProfile(args);
+  const seed = { ...profile, ...args.overrides };
 
   let config;
   if (interactive) {
     p.intro('📦 Packkit');
-    config = normalizeConfig(await runWizard(args.overrides));
+    config = normalizeConfig(await runWizard(seed));
   } else if (args.preset) {
-    config = fromPreset(args.preset, args.overrides);
+    config = fromPreset(args.preset, seed);
   } else {
-    config = normalizeConfig(args.overrides);
+    config = normalizeConfig(seed);
   }
 
   config.gitInit = args.git;
@@ -117,6 +122,18 @@ export async function run(argv = process.argv.slice(2)) {
 
 function runWord(config) {
   return config.packageManager === 'npm' ? 'npm run' : config.packageManager;
+}
+
+// Load a partial config from --from <file>, or a packkit.config.json in cwd.
+function loadProfile(args) {
+  const path = args.from || (existsSync('packkit.config.json') ? 'packkit.config.json' : null);
+  if (!path) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (err) {
+    console.error(`Could not read profile "${path}": ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
 }
 
 // Best-effort update check — TTY only, short timeout, never throws or blocks.

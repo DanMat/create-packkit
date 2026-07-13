@@ -34,6 +34,7 @@ export function parseCliArgs(argv) {
     allowPositionals: true,
     options: {
       preset: { type: 'string' },
+      from: { type: 'string' },
       name: { type: 'string' },
       yes: { type: 'boolean', short: 'y' },
       here: { type: 'boolean' },
@@ -72,6 +73,7 @@ export function parseCliArgs(argv) {
 
   return {
     preset,
+    from: values.from,
     name,
     here: !!values.here,
     yes: !!values.yes,

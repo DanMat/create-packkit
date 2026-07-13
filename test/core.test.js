@@ -73,6 +73,14 @@ test('storybook + pages workflow deploys the built catalog', () => {
   assert.match(wf, /storybook-static/);
 });
 
+test('README badges reflect config (npm for libs, none for private apps)', () => {
+  const lib = generate(fromPreset('ts-lib', { name: 'l', repo: 'https://github.com/x/l' })).files['README.md'];
+  assert.match(lib, /shields\.io\/npm\/v\/l/);
+  assert.match(lib, /actions\/workflows\/ci\.yml\/badge/);
+  const app = generate(fromPreset('react-app', { name: 'a' })).files['README.md'];
+  assert.doesNotMatch(app, /shields\.io\/npm/); // private app: no npm badge
+});
+
 test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });
