@@ -1,0 +1,38 @@
+{
+  "name": "packkit-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Packkit — let AI agents scaffold modern npm packages, CLIs, services, and apps as a native tool.",
+  "type": "module",
+  "bin": {
+    "packkit-mcp": "server.js"
+  },
+  "files": [
+    "server.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DanMat/create-packkit.git",
+    "directory": "mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "scaffold",
+    "generator",
+    "npm-package",
+    "packkit",
+    "ai",
+    "agent"
+  ],
+  "author": "DanMat <dannymatthew@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://danmat.github.io/create-packkit/",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "create-packkit": "^1.1.0"
+  }
+}

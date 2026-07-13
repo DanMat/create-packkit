@@ -37,6 +37,10 @@ npx create-packkit lib my-lib --no-install --no-git
 
 `--language ts|js` · `--framework none|react|vue|svelte` · `--target library|cli|service|app` (repeatable) · `--module esm|cjs|dual` · `--bundler tsup|tsdown|unbuild|rollup|none` · `--minify` · `--test vitest|jest|node|none` · `--lint eslint-prettier|biome|oxlint|none` · `--hooks ...` · `--release changesets|release-it|np|none` · `--workflows ci|npm-publish|pages|codeql|codecov|stale` (repeatable) · `--pkg-checks` (publint + are-the-types-wrong) · `--knip` · `--jsr` · `--deps renovate|dependabot|none` · `--license MIT|Apache-2.0|ISC|none` · `--pm npm|pnpm|yarn|bun` · `--from <file>` (load a JSON profile) · `--no-install` · `--no-git`
 
+## MCP server
+
+`packkit-mcp` exposes Packkit as Model Context Protocol tools (`packkit_schema`, `packkit_preview`, `packkit_scaffold`). MCP config: `{ "mcpServers": { "packkit": { "command": "npx", "args": ["-y", "packkit-mcp"] } } }`.
+
 ## Links
 - Web configurator: https://danmat.github.io/create-packkit/
 - Repo: https://github.com/DanMat/create-packkit

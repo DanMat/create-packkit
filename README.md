@@ -64,6 +64,12 @@ npx create-packkit my-lib ts-lib --no-install --no-git   # deterministic scaffol
 
 There's also an [`llms.txt`](llms.txt) (served at [danmat.github.io/create-packkit/llms.txt](https://danmat.github.io/create-packkit/llms.txt)) describing the commands for LLMs.
 
+**MCP server** — [`packkit-mcp`](mcp) exposes Packkit as a native [Model Context Protocol](https://modelcontextprotocol.io) tool (schema / preview / scaffold). Add to your agent's MCP config:
+
+```json
+{ "mcpServers": { "packkit": { "command": "npx", "args": ["-y", "packkit-mcp"] } } }
+```
+
 ## How it works
 
 Packkit is a pure `config → { files }` **core** that runs in both Node and the browser:

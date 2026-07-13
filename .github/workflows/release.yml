@@ -51,6 +51,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Publish packkit-mcp (only when its version is new)
+        working-directory: mcp
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if [ "$(npm view packkit-mcp@$V version 2>/dev/null)" = "$V" ]; then
+            echo "packkit-mcp@$V already published — skipping"
+          else
+            npm publish --provenance --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: GitHub Release
         run: gh release create "v${{ steps.bump.outputs.version }}" --generate-notes
         env:
