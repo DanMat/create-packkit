@@ -28,7 +28,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [x] ~~Non-interactive CLI + full flag parity~~ — agents can generate any config deterministically.
 - [x] ~~`--schema` (machine-readable JSON) + `llms.txt`~~ — introspection + LLM discovery.
 - [x] ~~Preset shortcuts~~ — `lib`, `rlib`, `svc`, …
-- [ ] **MCP server** (`packkit-mcp`) — expose Packkit as a Model Context Protocol tool so agents call it natively.
+- [x] ~~**MCP server** (`packkit-mcp`)~~ — **Shipped** (schema / preview / scaffold tools; `npx -y packkit-mcp`).
 - [ ] **Publicize** — dev.to / Show HN post, `awesome-*` list PRs, npm keywords, and register the `llms.txt`.
 
 ## Ideas / maybe
