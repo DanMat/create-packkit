@@ -8,12 +8,16 @@ export default {
     const pkg = { scripts: {}, devDependencies: {} };
     const ext = cfg.ext;
 
+    const testExt = cfg.isReact ? cfg.srcExt : ext;
+
     if (cfg.test === 'vitest') {
       files[`vitest.config.${ext}`] = [
         `import { defineConfig } from 'vitest/config';`,
         ``,
         `export default defineConfig({`,
         `\ttest: {`,
+        cfg.isReact ? `\t\tenvironment: 'jsdom',` : null,
+        cfg.isReact ? `\t\tglobals: true,` : null,
         cfg.coverage ? `\t\tcoverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,
         `\t},`,
         `});`,
@@ -22,11 +26,16 @@ export default {
       pkg.scripts.test = 'vitest run';
       pkg.scripts['test:watch'] = 'vitest';
       pkg.devDependencies.vitest = '^2.0.0';
+      if (cfg.isReact) {
+        pkg.devDependencies.jsdom = '^25.0.0';
+        pkg.devDependencies['@testing-library/react'] = '^16.0.0';
+        pkg.devDependencies['@testing-library/dom'] = '^10.0.0';
+      }
       if (cfg.coverage) {
         pkg.scripts.coverage = 'vitest run --coverage';
         pkg.devDependencies['@vitest/coverage-v8'] = '^2.0.0';
       }
-      files[`src/index.test.${ext}`] = exampleTest('vitest', cfg);
+      files[`src/index.test.${testExt}`] = exampleTest('vitest', cfg);
     } else if (cfg.test === 'jest') {
       files['jest.config.js'] = jestConfig(cfg);
       pkg.scripts.test = 'jest';
@@ -37,11 +46,11 @@ export default {
         pkg.devDependencies['@types/jest'] = '^29.0.0';
       }
       if (cfg.coverage) pkg.scripts.coverage = 'jest --coverage';
-      files[`src/index.test.${ext}`] = exampleTest('jest', cfg);
+      files[`src/index.test.${testExt}`] = exampleTest('jest', cfg);
     } else if (cfg.test === 'node') {
       pkg.scripts.test = cfg.isTs ? 'node --import tsx --test "src/**/*.test.ts"' : 'node --test';
       if (cfg.isTs) pkg.devDependencies.tsx = '^4.0.0';
-      files[`src/index.test.${ext}`] = exampleTest('node', cfg);
+      files[`src/index.test.${testExt}`] = exampleTest('node', cfg);
     }
 
     return { files, pkg };
@@ -56,6 +65,21 @@ function importPath(runner, cfg) {
 
 function exampleTest(runner, cfg) {
   const imp = importPath(runner, cfg);
+  if (cfg.isReact) {
+    const api = runner === 'jest' ? '' : `import { describe, it, expect } from 'vitest';\n`;
+    return [
+      api + `import { render, screen } from '@testing-library/react';`,
+      `import { Button } from '${imp}';`,
+      ``,
+      `describe('Button', () => {`,
+      `\tit('renders its label', () => {`,
+      `\t\trender(<Button label="Click me" />);`,
+      `\t\texpect(screen.getByText('Click me')).toBeDefined();`,
+      `\t});`,
+      `});`,
+      ``,
+    ].join('\n');
+  }
   if (runner === 'node') {
     return [
       `import { test } from 'node:test';`,

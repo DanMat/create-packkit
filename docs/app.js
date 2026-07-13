@@ -88,7 +88,7 @@ function commandFor(cfg) {
   const d = defaultConfig();
   const parts = ['npx create-packkit', cfg.name || 'my-package'];
   const flag = (k, f) => { if (JSON.stringify(cfg[k]) !== JSON.stringify(d[k])) parts.push(`--${f} ${Array.isArray(cfg[k]) ? cfg[k].join(',') : cfg[k]}`); };
-  flag('language', 'language'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
+  flag('language', 'language'); flag('framework', 'framework'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
   flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release');
   flag('license', 'license'); flag('packageManager', 'pm');
   if (JSON.stringify(cfg.target) !== JSON.stringify(d.target)) parts.push(`--target ${cfg.target.join(' --target ')}`);

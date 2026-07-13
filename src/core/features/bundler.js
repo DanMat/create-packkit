@@ -33,7 +33,7 @@ export default {
     }
 
     // ---- build tooling ----
-    const entries = ['src/index.' + cfg.ext];
+    const entries = ['src/index.' + cfg.srcExt];
     if (cfg.hasCli) entries.push('src/cli.' + cfg.ext);
     const formats = [cfg.hasEsm && 'esm', cfg.hasCjs && 'cjs'].filter(Boolean);
 

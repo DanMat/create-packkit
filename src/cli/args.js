@@ -5,6 +5,7 @@ import { PRESET_NAMES } from '../core/presets.js';
 const OVERRIDE_FLAGS = {
   language: 'language',
   module: 'moduleFormat',
+  framework: 'framework',
   bundler: 'bundler',
   test: 'test',
   lint: 'lint',

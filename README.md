@@ -35,6 +35,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 | **Language** | TypeScript (strict) · JavaScript (ESM) |
 | **Module format** | ESM · CJS · dual (proper `exports` map) |
 | **Target** | Library · CLI tool · both |
+| **Framework** | None · **React** (component library — JSX, peer deps, jsdom tests) |
 | **Bundler** | tsup · tsdown · unbuild · rollup · none (tsc) |
 | **Tests** | Vitest · Jest · node:test · none (+ coverage) |
 | **Lint/format** | ESLint + Prettier · Biome · oxlint · none |
@@ -47,7 +48,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 
 ## Presets
 
-`ts-lib` · `js-lib` · `ts-cli` / `cli` · `minimal` · `full` — named bundles of the options above.
+`ts-lib` · `js-lib` · `ts-cli` / `cli` · `react-lib` · `react-lib-js` · `oss` · `minimal` · `full` — named bundles of the options above. See the [roadmap](ROADMAP.md) for what's next.
 
 ## How it works
 

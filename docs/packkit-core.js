@@ -38,6 +38,16 @@ var OPTIONS = {
       { value: "cli", label: "CLI tool (ships a bin)" }
     ]
   },
+  framework: {
+    group: "core",
+    type: "select",
+    label: "Framework",
+    default: "none",
+    choices: [
+      { value: "none", label: "None (plain package)" },
+      { value: "react", label: "React (component library)" }
+    ]
+  },
   packageManager: {
     group: "core",
     type: "select",
@@ -196,8 +206,11 @@ function normalizeConfig(input = {}) {
   if (!Array.isArray(cfg.workflows)) cfg.workflows = [];
   if (cfg.test === "none" || cfg.test === "node") cfg.coverage = false;
   if (cfg.workflows.includes("codecov")) cfg.coverage = true;
+  cfg.isReact = cfg.framework === "react";
+  if (cfg.isReact && !cfg.target.includes("library")) cfg.target = ["library", ...cfg.target];
   cfg.isTs = cfg.language === "ts";
   cfg.ext = cfg.isTs ? "ts" : "js";
+  cfg.srcExt = cfg.isReact ? cfg.isTs ? "tsx" : "jsx" : cfg.ext;
   cfg.hasLibrary = cfg.target.includes("library");
   cfg.hasCli = cfg.target.includes("cli");
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
@@ -295,8 +308,7 @@ var meta_default = {
       pkg.bugs = { url: `${cfg.repo.replace(/\.git$/, "")}/issues` };
       pkg.homepage = `${cfg.repo.replace(/\.git$/, "")}#readme`;
     }
-    const ext = cfg.ext;
-    files[`src/index.${ext}`] = cfg.hasLibrary ? libraryEntry(cfg) : `// ${cfg.name}
+    files[`src/index.${cfg.srcExt}`] = cfg.hasLibrary ? libraryEntry(cfg) : `// ${cfg.name}
 `;
     files["README.md"] = readme(cfg);
     files[".nvmrc"] = `${cfg.nodeVersion}
@@ -306,6 +318,7 @@ var meta_default = {
   }
 };
 function libraryEntry(cfg) {
+  if (cfg.isReact) return reactEntry(cfg);
   if (cfg.isTs) {
     return [
       `/** Greet someone by name. */`,
@@ -323,6 +336,33 @@ function libraryEntry(cfg) {
     ` */`,
     `export function greet(name) {`,
     `	return \`Hello, \${name}!\`;`,
+    `}`,
+    ``
+  ].join("\n");
+}
+function reactEntry(cfg) {
+  if (cfg.isTs) {
+    return [
+      `export interface ButtonProps {`,
+      `	/** Text shown inside the button. */`,
+      `	label: string;`,
+      `	onClick?: () => void;`,
+      `}`,
+      ``,
+      `/** A tiny example component \u2014 replace me. */`,
+      `export function Button({ label, onClick }: ButtonProps) {`,
+      `	return <button onClick={onClick}>{label}</button>;`,
+      `}`,
+      ``
+    ].join("\n");
+  }
+  return [
+    `/**`,
+    ` * A tiny example component \u2014 replace me.`,
+    ` * @param {{ label: string, onClick?: () => void }} props`,
+    ` */`,
+    `export function Button({ label, onClick }) {`,
+    `	return <button onClick={onClick}>{label}</button>;`,
     `}`,
     ``
   ].join("\n");
@@ -346,7 +386,18 @@ function readme(cfg) {
     "```",
     ""
   ];
-  if (cfg.hasLibrary) {
+  if (cfg.hasLibrary && cfg.isReact) {
+    lines.push(
+      "## Usage",
+      "",
+      "```" + (cfg.isTs ? "tsx" : "jsx"),
+      `import { Button } from '${cfg.name}';`,
+      "",
+      `<Button label="Click me" onClick={() => alert('hi')} />`,
+      "```",
+      ""
+    );
+  } else if (cfg.hasLibrary) {
     const imp = cfg.isTs || cfg.hasEsm ? `import { greet } from '${cfg.name}';` : `const { greet } = require('${cfg.name}');`;
     lines.push("## Usage", "", "```" + (cfg.isTs ? "ts" : "js"), imp, "", `greet('world'); // "Hello, world!"`, "```", "");
   }
@@ -385,7 +436,7 @@ var bundler_default = {
       if (cfg.hasEsm) pkg.module = esm;
       if (cfg.isTs) pkg.types = dts;
     }
-    const entries = ["src/index." + cfg.ext];
+    const entries = ["src/index." + cfg.srcExt];
     if (cfg.hasCli) entries.push("src/cli." + cfg.ext);
     const formats = [cfg.hasEsm && "esm", cfg.hasCjs && "cjs"].filter(Boolean);
     if (cfg.bundler === "tsup" || cfg.bundler === "tsdown") {
@@ -472,7 +523,8 @@ var typescript_default = {
       target: "ES2022",
       module: "ESNext",
       moduleResolution: "Bundler",
-      lib: ["ES2022"],
+      lib: cfg.isReact ? ["ES2022", "DOM", "DOM.Iterable"] : ["ES2022"],
+      ...cfg.isReact ? { jsx: "react-jsx" } : {},
       strict: true,
       noUncheckedIndexedAccess: true,
       esModuleInterop: true,
@@ -508,6 +560,29 @@ var typescript_default = {
   }
 };
 
+// src/core/features/react.js
+var react_default = {
+  id: "react",
+  active: (cfg) => cfg.isReact,
+  apply(cfg) {
+    const pkg = {
+      peerDependencies: {
+        react: ">=18",
+        "react-dom": ">=18"
+      },
+      devDependencies: {
+        react: "^18.3.0",
+        "react-dom": "^18.3.0"
+      }
+    };
+    if (cfg.isTs) {
+      pkg.devDependencies["@types/react"] = "^18.3.0";
+      pkg.devDependencies["@types/react-dom"] = "^18.3.0";
+    }
+    return { files: {}, pkg };
+  }
+};
+
 // src/core/features/test.js
 var test_default = {
   id: "test",
@@ -516,12 +591,15 @@ var test_default = {
     const files = {};
     const pkg = { scripts: {}, devDependencies: {} };
     const ext = cfg.ext;
+    const testExt = cfg.isReact ? cfg.srcExt : ext;
     if (cfg.test === "vitest") {
       files[`vitest.config.${ext}`] = [
         `import { defineConfig } from 'vitest/config';`,
         ``,
         `export default defineConfig({`,
         `	test: {`,
+        cfg.isReact ? `		environment: 'jsdom',` : null,
+        cfg.isReact ? `		globals: true,` : null,
         cfg.coverage ? `		coverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,
         `	},`,
         `});`,
@@ -530,11 +608,16 @@ var test_default = {
       pkg.scripts.test = "vitest run";
       pkg.scripts["test:watch"] = "vitest";
       pkg.devDependencies.vitest = "^2.0.0";
+      if (cfg.isReact) {
+        pkg.devDependencies.jsdom = "^25.0.0";
+        pkg.devDependencies["@testing-library/react"] = "^16.0.0";
+        pkg.devDependencies["@testing-library/dom"] = "^10.0.0";
+      }
       if (cfg.coverage) {
         pkg.scripts.coverage = "vitest run --coverage";
         pkg.devDependencies["@vitest/coverage-v8"] = "^2.0.0";
       }
-      files[`src/index.test.${ext}`] = exampleTest("vitest", cfg);
+      files[`src/index.test.${testExt}`] = exampleTest("vitest", cfg);
     } else if (cfg.test === "jest") {
       files["jest.config.js"] = jestConfig(cfg);
       pkg.scripts.test = "jest";
@@ -545,11 +628,11 @@ var test_default = {
         pkg.devDependencies["@types/jest"] = "^29.0.0";
       }
       if (cfg.coverage) pkg.scripts.coverage = "jest --coverage";
-      files[`src/index.test.${ext}`] = exampleTest("jest", cfg);
+      files[`src/index.test.${testExt}`] = exampleTest("jest", cfg);
     } else if (cfg.test === "node") {
       pkg.scripts.test = cfg.isTs ? 'node --import tsx --test "src/**/*.test.ts"' : "node --test";
       if (cfg.isTs) pkg.devDependencies.tsx = "^4.0.0";
-      files[`src/index.test.${ext}`] = exampleTest("node", cfg);
+      files[`src/index.test.${testExt}`] = exampleTest("node", cfg);
     }
     return { files, pkg };
   }
@@ -561,6 +644,22 @@ function importPath(runner, cfg) {
 }
 function exampleTest(runner, cfg) {
   const imp = importPath(runner, cfg);
+  if (cfg.isReact) {
+    const api2 = runner === "jest" ? "" : `import { describe, it, expect } from 'vitest';
+`;
+    return [
+      api2 + `import { render, screen } from '@testing-library/react';`,
+      `import { Button } from '${imp}';`,
+      ``,
+      `describe('Button', () => {`,
+      `	it('renders its label', () => {`,
+      `		render(<Button label="Click me" />);`,
+      `		expect(screen.getByText('Click me')).toBeDefined();`,
+      `	});`,
+      `});`,
+      ``
+    ].join("\n");
+  }
   if (runner === "node") {
     return [
       `import { test } from 'node:test';`,
@@ -1298,6 +1397,7 @@ var features_default = [
   meta_default,
   bundler_default,
   typescript_default,
+  react_default,
   test_default,
   lint_default,
   githooks_default,
@@ -1316,6 +1416,24 @@ var PRESETS = {
   "js-lib": { language: "js", target: ["library"], moduleFormat: "dual", bundler: "tsup" },
   "ts-cli": { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
   cli: { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
+  "react-lib": { language: "ts", framework: "react", target: ["library"], moduleFormat: "dual", test: "vitest" },
+  "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "dual", bundler: "tsup", test: "vitest" },
+  oss: {
+    language: "ts",
+    target: ["library"],
+    moduleFormat: "dual",
+    bundler: "tsup",
+    test: "vitest",
+    coverage: true,
+    lint: "eslint-prettier",
+    gitHooks: "simple-git-hooks",
+    release: "changesets",
+    workflows: ["ci", "npm-publish", "codeql", "codecov"],
+    deps: "renovate",
+    community: true,
+    agents: true,
+    vscode: true
+  },
   minimal: {
     language: "ts",
     target: ["library"],

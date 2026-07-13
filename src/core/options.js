@@ -35,6 +35,13 @@ export const OPTIONS = {
       { value: 'cli', label: 'CLI tool (ships a bin)' },
     ],
   },
+  framework: {
+    group: 'core', type: 'select', label: 'Framework', default: 'none',
+    choices: [
+      { value: 'none', label: 'None (plain package)' },
+      { value: 'react', label: 'React (component library)' },
+    ],
+  },
   packageManager: {
     group: 'core', type: 'select', label: 'Package manager', default: 'npm',
     choices: [
@@ -183,8 +190,14 @@ export function normalizeConfig(input = {}) {
   if (cfg.workflows.includes('codecov')) cfg.coverage = true;
   // npm-publish + changesets are complementary; nothing to coerce, just noted.
 
+  cfg.isReact = cfg.framework === 'react';
+  // A React component library is a library; make sure it's targeted.
+  if (cfg.isReact && !cfg.target.includes('library')) cfg.target = ['library', ...cfg.target];
+
   cfg.isTs = cfg.language === 'ts';
   cfg.ext = cfg.isTs ? 'ts' : 'js';
+  // Source files carry JSX for React; config files keep .ts/.js.
+  cfg.srcExt = cfg.isReact ? (cfg.isTs ? 'tsx' : 'jsx') : cfg.ext;
   cfg.hasLibrary = cfg.target.includes('library');
   cfg.hasCli = cfg.target.includes('cli');
   cfg.hasEsm = cfg.moduleFormat === 'esm' || cfg.moduleFormat === 'dual';

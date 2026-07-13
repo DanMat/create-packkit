@@ -24,8 +24,7 @@ export default {
     }
 
     // Source entry point.
-    const ext = cfg.ext;
-    files[`src/index.${ext}`] = cfg.hasLibrary
+    files[`src/index.${cfg.srcExt}`] = cfg.hasLibrary
       ? libraryEntry(cfg)
       : `// ${cfg.name}\n`;
 
@@ -43,6 +42,7 @@ export default {
 };
 
 function libraryEntry(cfg) {
+  if (cfg.isReact) return reactEntry(cfg);
   if (cfg.isTs) {
     return [
       `/** Greet someone by name. */`,
@@ -60,6 +60,34 @@ function libraryEntry(cfg) {
     ` */`,
     `export function greet(name) {`,
     `\treturn \`Hello, \${name}!\`;`,
+    `}`,
+    ``,
+  ].join('\n');
+}
+
+function reactEntry(cfg) {
+  if (cfg.isTs) {
+    return [
+      `export interface ButtonProps {`,
+      `\t/** Text shown inside the button. */`,
+      `\tlabel: string;`,
+      `\tonClick?: () => void;`,
+      `}`,
+      ``,
+      `/** A tiny example component — replace me. */`,
+      `export function Button({ label, onClick }: ButtonProps) {`,
+      `\treturn <button onClick={onClick}>{label}</button>;`,
+      `}`,
+      ``,
+    ].join('\n');
+  }
+  return [
+    `/**`,
+    ` * A tiny example component — replace me.`,
+    ` * @param {{ label: string, onClick?: () => void }} props`,
+    ` */`,
+    `export function Button({ label, onClick }) {`,
+    `\treturn <button onClick={onClick}>{label}</button>;`,
     `}`,
     ``,
   ].join('\n');
@@ -86,7 +114,11 @@ function readme(cfg) {
     '',
   ];
 
-  if (cfg.hasLibrary) {
+  if (cfg.hasLibrary && cfg.isReact) {
+    lines.push('## Usage', '', '```' + (cfg.isTs ? 'tsx' : 'jsx'),
+      `import { Button } from '${cfg.name}';`, '',
+      `<Button label="Click me" onClick={() => alert('hi')} />`, '```', '');
+  } else if (cfg.hasLibrary) {
     const imp = cfg.isTs || cfg.hasEsm ? `import { greet } from '${cfg.name}';` : `const { greet } = require('${cfg.name}');`;
     lines.push('## Usage', '', '```' + (cfg.isTs ? 'ts' : 'js'), imp, '', `greet('world'); // "Hello, world!"`, '```', '');
   }

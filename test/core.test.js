@@ -29,6 +29,18 @@ test('full preset: workflows + community + agents present', () => {
   assert.ok(out.files['LICENSE']);
 });
 
+test('react-lib: JSX source, peer deps, jsdom tests', () => {
+  const out = generate(fromPreset('react-lib', { name: 'rl' }));
+  assert.ok(out.files['src/index.tsx'], 'tsx entry');
+  assert.ok(out.files['src/index.test.tsx'], 'tsx test');
+  assert.match(out.files['vitest.config.ts'], /jsdom/);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.peerDependencies.react, '>=18');
+  assert.ok(pkg.devDependencies['@types/react']);
+  assert.ok(pkg.devDependencies['@testing-library/react']);
+  assert.equal(JSON.parse(out.files['tsconfig.json']).compilerOptions.jsx, 'react-jsx');
+});
+
 test('minimal preset: no tooling extras', () => {
   const out = generate(fromPreset('minimal', { name: 'm' }));
   assert.equal(out.files['vitest.config.ts'], undefined);
