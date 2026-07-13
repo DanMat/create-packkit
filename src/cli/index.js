@@ -1,0 +1,112 @@
+import { resolve, basename } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import * as p from '@clack/prompts';
+import { generate, fromPreset, normalizeConfig, PRESET_NAMES } from '../core/index.js';
+import { parseCliArgs } from './args.js';
+import { runWizard } from './wizard.js';
+import { writeProject, dirIsEmptyOrMissing, gitInit, installDeps } from './write.js';
+
+const pkgVersion = () => {
+  try {
+    const url = new URL('../../package.json', import.meta.url);
+    return JSON.parse(readFileSync(fileURLToPath(url), 'utf8')).version;
+  } catch {
+    return '0.0.0';
+  }
+};
+
+const HELP = `
+packkit — scaffold a modern npm package or CLI
+
+Usage:
+  npm create packkit@latest [name] [options]
+  npx packkit [preset] [name] [options]
+
+Presets: ${PRESET_NAMES.join(', ')}
+
+Options:
+  --preset <name>     Use a preset (skips the wizard)
+  --name <name>       Package name
+  --here              Scaffold into the current directory
+  -y, --yes           Accept defaults / preset, no prompts
+  --no-install        Skip dependency install
+  --no-git            Skip git init
+  --pm <manager>      npm | pnpm | yarn | bun
+  --language <ts|js>  --module <esm|cjs|dual>  --bundler <tsup|tsdown|unbuild|rollup|none>
+  --test <vitest|jest|node|none>  --lint <eslint-prettier|biome|oxlint|none>
+  --license <MIT|Apache-2.0|ISC|none>
+  -h, --help          Show this help
+  -v, --version       Show version
+
+Examples:
+  npx packkit ts-lib my-lib
+  npm create packkit@latest my-cli -- --preset cli
+  npx packkit --preset full my-pkg --pm pnpm
+`;
+
+export async function run(argv = process.argv.slice(2)) {
+  const args = parseCliArgs(argv);
+  if (args.help) return void console.log(HELP);
+  if (args.version) return void console.log(pkgVersion());
+
+  const interactive = !args.preset && !args.yes && process.stdout.isTTY;
+
+  let config;
+  if (interactive) {
+    p.intro('📦 Packkit');
+    config = normalizeConfig(await runWizard(args.overrides));
+  } else if (args.preset) {
+    config = fromPreset(args.preset, args.overrides);
+  } else {
+    config = normalizeConfig(args.overrides);
+  }
+
+  config.gitInit = args.git;
+  config.install = args.install;
+
+  // Resolve the target directory.
+  const targetDir = args.here ? process.cwd() : resolve(process.cwd(), config.name);
+  if (!args.here && !config.name) {
+    console.error('A package name is required (pass one, or run interactively).');
+    process.exit(1);
+  }
+  if (!dirIsEmptyOrMissing(targetDir)) {
+    console.error(`Target directory "${basename(targetDir)}" is not empty. Aborting.`);
+    process.exit(1);
+  }
+
+  // Generate + write.
+  const { files, summary } = generate(config);
+  await writeProject(targetDir, files);
+
+  // Post steps.
+  if (config.gitInit) gitInit(targetDir);
+  if (config.install) {
+    const s = p.spinner();
+    s.start(`Installing dependencies with ${config.packageManager}`);
+    const ok = installDeps(config.packageManager, targetDir);
+    s.stop(ok ? 'Dependencies installed' : 'Install skipped (run it manually)');
+  }
+
+  const rel = args.here ? '.' : config.name;
+  const next = [
+    args.here ? null : `cd ${rel}`,
+    config.install ? null : `${config.packageManager} install`,
+    summary.stack.includes('tsup') || summary.stack.includes('tsdown') ? `${runWord(config)} build` : null,
+    summary.stack.some((s) => ['vitest', 'jest'].includes(s)) ? `${runWord(config)} test` : null,
+  ].filter(Boolean);
+
+  const done = `Created ${summary.name} — ${summary.fileCount} files · ${summary.stack.join(' · ')}`;
+  if (interactive) {
+    p.note(next.join('\n') || 'You are all set.', 'Next steps');
+    p.outro(done);
+  } else {
+    console.log(done);
+    if (next.length) console.log('\nNext steps:\n  ' + next.join('\n  '));
+  }
+}
+
+function runWord(config) {
+  return config.packageManager === 'npm' ? 'npm run' : config.packageManager;
+}

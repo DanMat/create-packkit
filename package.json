@@ -1,45 +1,55 @@
 {
-  "name": "create-node-package",
-  "version": "1.0.0",
-  "description": "Generates a node module template with CHANGELOG, build, deployment, jest, linter and more. All configured and ready to use.",
-  "main": "bin/cli.js",
+  "name": "create-packkit",
+  "version": "0.1.0",
+  "description": "Highly configurable scaffolder for modern npm packages and CLIs — pick your stack (TS/JS, bundler, tests, linter, CI, releases) from a CLI or a web configurator.",
+  "type": "module",
   "bin": {
-    "create-node-package": "./bin/cli.js"
+    "create-packkit": "bin/cli.js",
+    "packkit": "bin/cli.js"
+  },
+  "exports": {
+    ".": "./src/core/index.js",
+    "./core": "./src/core/index.js",
+    "./cli": "./src/cli/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node bin/cli.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DanMat/create-node-package.git"
+    "url": "git+https://github.com/DanMat/create-packkit.git"
   },
   "keywords": [
+    "create",
+    "scaffold",
+    "scaffolding",
+    "generator",
+    "boilerplate",
+    "starter",
+    "template",
+    "npm-package",
+    "typescript",
     "cli",
-    "node-module-template"
+    "tsup",
+    "vitest"
   ],
   "author": "DanMat <dannymatthew@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/DanMat/create-node-package/issues"
+    "url": "https://github.com/DanMat/create-packkit/issues"
   },
-  "homepage": "https://github.com/DanMat/create-node-package#readme",
+  "homepage": "https://danmat.github.io/create-packkit/",
   "dependencies": {
-    "chalk": "^4.1.0",
-    "check-folder-exists": "^0.1.1",
-    "mkdirp": "^1.0.4",
-    "npm-name": "^6.0.1",
-    "prompts": "^2.4.0",
-    "validate-npm-package-name": "^3.0.0",
-    "yeoman-environment": "^2.10.3",
-    "yeoman-generator": "^4.12.0"
-  },
-  "devDependencies": {
-    "auto": "^10.5.0"
-  },
-  "auto": {
-    "plugins": [
-      "npm"
-    ],
-    "onlyPublishWithReleaseLabel": true
+    "@clack/prompts": "^0.7.0"
   }
 }

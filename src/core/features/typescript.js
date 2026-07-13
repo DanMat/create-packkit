@@ -1,0 +1,48 @@
+import { toJson } from '../render.js';
+
+export default {
+  id: 'typescript',
+  active: (cfg) => cfg.isTs,
+  apply(cfg) {
+    const noBuild = cfg.bundler === 'none';
+    const compilerOptions = {
+      target: 'ES2022',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      lib: ['ES2022'],
+      strict: true,
+      noUncheckedIndexedAccess: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      verbatimModuleSyntax: cfg.bundler !== 'none',
+      declaration: true,
+    };
+    if (noBuild) {
+      // tsc is the build: emit to dist.
+      compilerOptions.moduleResolution = 'NodeNext';
+      compilerOptions.module = 'NodeNext';
+      compilerOptions.outDir = 'dist';
+      compilerOptions.rootDir = 'src';
+    } else {
+      compilerOptions.noEmit = true;
+    }
+
+    return {
+      files: {
+        'tsconfig.json': toJson({
+          $schema: 'https://json.schemastore.org/tsconfig',
+          compilerOptions,
+          include: ['src'],
+          exclude: ['dist', 'node_modules'],
+        }),
+      },
+      pkg: {
+        devDependencies: {
+          typescript: '^5.5.0',
+          '@types/node': `^${cfg.nodeVersion}.0.0`,
+        },
+      },
+    };
+  },
+};
