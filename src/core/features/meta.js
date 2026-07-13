@@ -16,6 +16,7 @@ export default {
 
     const kw = String(cfg.keywords || '').split(',').map((s) => s.trim()).filter(Boolean);
     if (kw.length) pkg.keywords = kw;
+    if (cfg.license !== 'none') pkg.license = cfg.license;
     if (cfg.author) pkg.author = cfg.author;
     if (cfg.repo) {
       pkg.repository = { type: 'git', url: `git+${cfg.repo.replace(/\.git$/, '')}.git` };

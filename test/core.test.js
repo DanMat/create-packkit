@@ -81,19 +81,52 @@ test('README badges reflect config (npm for libs, none for private apps)', () =>
   assert.doesNotMatch(app, /shields\.io\/npm/); // private app: no npm badge
 });
 
+test('package checks + knip: scripts, deps, CI steps', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'c', pkgChecks: true, knip: true, workflows: ['ci'] }));
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.scripts['check:pkg'], 'publint && attw --pack');
+  assert.ok(pkg.devDependencies.publint && pkg.devDependencies['@arethetypeswrong/cli'] && pkg.devDependencies.knip);
+  assert.match(out.files['.github/workflows/ci.yml'], /check:pkg/);
+  // pkgChecks is coerced off for non-publishable targets
+  assert.equal(generate(fromPreset('react-app', { name: 'c', pkgChecks: true })).config.pkgChecks, false);
+});
+
+test('jsr: jsr.json + workflow for a plain TS library only', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'j', jsr: true }));
+  assert.ok(out.files['jsr.json']);
+  assert.ok(out.files['.github/workflows/jsr.yml']);
+  assert.match(out.files['jsr.json'], /@scope\/j/);
+  // not offered for JS or framework libs
+  assert.equal(generate(fromPreset('react-lib', { name: 'j', jsr: true })).config.jsr, false);
+  assert.equal(generate(fromPreset('js-lib', { name: 'j', jsr: true })).config.jsr, false);
+});
+
+test('generated workflows are well-formed (steps: present under each job)', () => {
+  const out = generate(fromPreset('oss', { name: 'w' }));
+  for (const path of Object.keys(out.files).filter((f) => f.startsWith('.github/workflows/'))) {
+    const yml = out.files[path];
+    if (yml.includes('runs-on:')) {
+      assert.match(yml, /\n {4}steps:\n/, `${path} must have a steps: key`);
+    }
+  }
+});
+
 test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });
 
-test('ts-lib: valid package.json with dual exports', () => {
+test('ts-lib: valid package.json with dual exports + per-condition types', () => {
   const out = generate(fromPreset('ts-lib', { name: 'x-lib' }));
   assert.ok(out.files['src/index.ts']);
   const pkg = JSON.parse(out.files['package.json']);
   assert.equal(pkg.name, 'x-lib');
   assert.equal(pkg.type, 'module');
-  assert.ok(pkg.exports['.'].import);
-  assert.ok(pkg.exports['.'].require);
-  assert.ok(pkg.exports['.'].types);
+  assert.equal(pkg.license, 'MIT');
+  // import → .d.ts, require → .d.cts (publint / are-the-types-wrong correct)
+  assert.equal(pkg.exports['.'].import.types, './dist/index.d.ts');
+  assert.equal(pkg.exports['.'].import.default, './dist/index.js');
+  assert.equal(pkg.exports['.'].require.types, './dist/index.d.cts');
+  assert.equal(pkg.exports['.'].require.default, './dist/index.cjs');
 });
 
 test('cli preset: adds a bin and cli entry', () => {

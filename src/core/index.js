@@ -6,15 +6,15 @@ import { normalizeConfig, OPTIONS, GROUPS, defaultConfig } from './options.js';
 import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
-import { PRESETS, PRESET_NAMES, PRESET_INFO } from './presets.js';
+import { PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset } from './presets.js';
 
-export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO };
+export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
 
-/** Apply a named preset over the defaults, returning a full config. */
+/** Apply a named preset (or alias) over the defaults, returning a full config. */
 export function fromPreset(name, overrides = {}) {
-  const preset = PRESETS[name];
-  if (!preset) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(', ')}`);
-  return normalizeConfig({ ...preset, ...overrides });
+  const canonical = resolvePreset(name);
+  if (!canonical) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(', ')}`);
+  return normalizeConfig({ ...PRESETS[canonical], ...overrides });
 }
 
 /** Turn a config into a complete set of files. */

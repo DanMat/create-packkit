@@ -2,7 +2,7 @@ import { resolve, basename } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
-import { generate, fromPreset, normalizeConfig, PRESET_NAMES } from '../core/index.js';
+import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
 import { writeProject, dirIsEmptyOrMissing, gitInit, installDeps } from './write.js';
@@ -41,9 +41,13 @@ Options:
   --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
   --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
   --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>
+  --pkg-checks (publint + are-the-types-wrong)   --knip   --jsr
   --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
+  --schema            Print the full option/preset schema as JSON (for tools/agents)
   -h, --help          Show this help
   -v, --version       Show version
+
+Preset shortcuts: lib, jslib, rlib, rapp, vlib, vapp, slib, sapp, svc
 
 Examples:
   npx packkit ts-lib my-lib
@@ -55,6 +59,10 @@ export async function run(argv = process.argv.slice(2)) {
   const args = parseCliArgs(argv);
   if (args.help) return void console.log(HELP);
   if (args.version) return void console.log(pkgVersion());
+  if (args.schema) {
+    // Machine-readable interface for tools/agents: every option, preset, and alias.
+    return void console.log(JSON.stringify({ version: pkgVersion(), options: OPTIONS, presets: PRESET_INFO, aliases: PRESET_ALIASES }, null, 2));
+  }
 
   const interactive = !args.preset && !args.yes && !args.from && process.stdout.isTTY;
 

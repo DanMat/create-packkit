@@ -91,6 +91,8 @@ export const OPTIONS = {
   },
   coverage: { group: 'quality', type: 'boolean', label: 'Coverage reporting', default: true },
   storybook: { group: 'quality', type: 'boolean', label: 'Storybook (component libraries)', default: false },
+  pkgChecks: { group: 'quality', type: 'boolean', label: 'Package checks (publint + are-the-types-wrong)', default: false },
+  knip: { group: 'quality', type: 'boolean', label: 'Knip (unused files / deps / exports)', default: false },
 
   // ---- lint / format ----
   lint: {
@@ -124,6 +126,7 @@ export const OPTIONS = {
       { value: 'none', label: 'None' },
     ],
   },
+  jsr: { group: 'release', type: 'boolean', label: 'Publish to JSR (TS-first registry)', default: false },
 
   // ---- github actions (configurable workflows) ----
   workflows: {
@@ -236,5 +239,11 @@ export function normalizeConfig(input = {}) {
 
   // Storybook only applies to component libraries.
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+
+  cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
+  // Package-correctness checks only make sense for a publishable package.
+  if (!cfg.publishable) cfg.pkgChecks = false;
+  // JSR is TypeScript-first, ESM, and for plain (non-framework) libraries.
+  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
   return cfg;
 }

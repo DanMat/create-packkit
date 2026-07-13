@@ -110,6 +110,8 @@ var OPTIONS = {
   },
   coverage: { group: "quality", type: "boolean", label: "Coverage reporting", default: true },
   storybook: { group: "quality", type: "boolean", label: "Storybook (component libraries)", default: false },
+  pkgChecks: { group: "quality", type: "boolean", label: "Package checks (publint + are-the-types-wrong)", default: false },
+  knip: { group: "quality", type: "boolean", label: "Knip (unused files / deps / exports)", default: false },
   // ---- lint / format ----
   lint: {
     group: "quality",
@@ -149,6 +151,7 @@ var OPTIONS = {
       { value: "none", label: "None" }
     ]
   },
+  jsr: { group: "release", type: "boolean", label: "Publish to JSR (TS-first registry)", default: false },
   // ---- github actions (configurable workflows) ----
   workflows: {
     group: "ci",
@@ -241,6 +244,9 @@ function normalizeConfig(input = {}) {
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+  cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
+  if (!cfg.publishable) cfg.pkgChecks = false;
+  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
   return cfg;
 }
 
@@ -328,6 +334,7 @@ var meta_default = {
     };
     const kw = String(cfg.keywords || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (kw.length) pkg.keywords = kw;
+    if (cfg.license !== "none") pkg.license = cfg.license;
     if (cfg.author) pkg.author = cfg.author;
     if (cfg.repo) {
       pkg.repository = { type: "git", url: `git+${cfg.repo.replace(/\.git$/, "")}.git` };
@@ -467,16 +474,15 @@ var bundler_default = {
       pkg.files = ["dist"];
       const esm = "./dist/index.js";
       const cjs = "./dist/index.cjs";
-      const dts = "./dist/index.d.ts";
+      const dtsEsm = "./dist/index.d.ts";
+      const dtsCjs = cfg.moduleFormat === "dual" ? "./dist/index.d.cts" : dtsEsm;
       const exp = {};
-      if (cfg.isTs) exp.types = dts;
-      if (cfg.hasEsm) exp.import = esm;
-      if (cfg.hasCjs) exp.require = build ? cjs : "./dist/index.cjs";
+      if (cfg.hasEsm) exp.import = cfg.isTs ? { types: dtsEsm, default: esm } : esm;
+      if (cfg.hasCjs) exp.require = cfg.isTs ? { types: dtsCjs, default: cjs } : cjs;
       pkg.exports = { ".": exp };
-      if (cfg.hasCjs) pkg.main = exp.require;
-      else pkg.main = esm;
+      pkg.main = cfg.hasCjs ? cjs : esm;
       if (cfg.hasEsm) pkg.module = esm;
-      if (cfg.isTs) pkg.types = dts;
+      if (cfg.isTs) pkg.types = cfg.hasEsm ? dtsEsm : dtsCjs;
     }
     const entries = ["src/index." + cfg.srcExt];
     if (cfg.hasCli) entries.push("src/cli." + cfg.ext);
@@ -1231,6 +1237,63 @@ ${importLine}
 ${body}`;
 }
 
+// src/core/features/checks.js
+var checks_default = {
+  id: "checks",
+  active: (cfg) => cfg.pkgChecks || cfg.knip,
+  apply(cfg) {
+    const pkg = { scripts: {}, devDependencies: {} };
+    if (cfg.pkgChecks) {
+      pkg.scripts["check:pkg"] = "publint && attw --pack";
+      pkg.devDependencies.publint = "^0.3.0";
+      pkg.devDependencies["@arethetypeswrong/cli"] = "^0.18.0";
+    }
+    if (cfg.knip) {
+      pkg.scripts.knip = "knip";
+      pkg.devDependencies.knip = "^5.0.0";
+    }
+    return { files: {}, pkg };
+  }
+};
+
+// src/core/features/jsr.js
+var jsr_default = {
+  id: "jsr",
+  active: (cfg) => cfg.jsr,
+  apply(cfg) {
+    const name = cfg.name.startsWith("@") ? cfg.name : `@scope/${cfg.name}`;
+    return {
+      files: {
+        "jsr.json": toJson({
+          name,
+          version: "0.0.0",
+          exports: `./src/index.${cfg.ext}`
+        }),
+        ".github/workflows/jsr.yml": [
+          "name: Publish to JSR",
+          "on:",
+          "  push:",
+          '    tags: ["v*"]',
+          "permissions:",
+          "  contents: read",
+          "  id-token: write",
+          "jobs:",
+          "  publish:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-node@v4",
+          "        with:",
+          "          node-version: '20'",
+          "      - run: npx jsr publish",
+          ""
+        ].join("\n")
+      },
+      pkg: {}
+    };
+  }
+};
+
 // src/core/features/workflows.js
 function pmInstall(cfg) {
   return {
@@ -1298,7 +1361,9 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, "typecheck")}`);
   if (cfg.lint !== "none") jobs.push(`      - run: ${pmRun(cfg, "lint")}`);
   if (cfg.test !== "none") jobs.push(`      - run: ${pmRun(cfg, codecov ? "coverage" : "test")}`);
+  if (cfg.knip) jobs.push(`      - run: ${pmRun(cfg, "knip")}`);
   if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, "build")}`);
+  if (cfg.pkgChecks) jobs.push(`      - run: ${pmRun(cfg, "check:pkg")}`);
   const cov = codecov ? "\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}" : "";
   return [
     "name: CI",
@@ -1309,6 +1374,7 @@ function ciWorkflow(cfg, codecov) {
     "jobs:",
     "  ci:",
     "    runs-on: ubuntu-latest",
+    "    steps:",
     setupSteps(cfg),
     jobs.join("\n") + cov,
     ""
@@ -1329,6 +1395,7 @@ function releaseWorkflow(cfg) {
       "jobs:",
       "  release:",
       "    runs-on: ubuntu-latest",
+      "    steps:",
       setupSteps(cfg),
       "      - uses: changesets/action@v1",
       "        with:",
@@ -1352,6 +1419,7 @@ function releaseWorkflow(cfg) {
     "jobs:",
     "  publish:",
     "    runs-on: ubuntu-latest",
+    "    steps:",
     setupSteps(cfg),
     cfg.hasBuild ? `      - run: ${pmRun(cfg, "build")}` : null,
     "      - run: npm publish --provenance --access public",
@@ -1822,6 +1890,8 @@ var features_default = [
   githooks_default,
   release_default,
   cli_default,
+  checks_default,
+  jsr_default,
   workflows_default,
   storybook_default,
   community_default,
@@ -1871,7 +1941,9 @@ var PRESETS = {
     deps: "renovate",
     community: true,
     agents: true,
-    vscode: true
+    vscode: true,
+    pkgChecks: true,
+    knip: true
   },
   minimal: {
     language: "ts",
@@ -1906,6 +1978,23 @@ var PRESETS = {
   }
 };
 var PRESET_NAMES = Object.keys(PRESETS);
+var PRESET_ALIASES = {
+  lib: "ts-lib",
+  jslib: "js-lib",
+  rlib: "react-lib",
+  rapp: "react-app",
+  vlib: "vue-lib",
+  vapp: "vue-app",
+  slib: "svelte-lib",
+  sapp: "svelte-app",
+  svc: "node-service",
+  service: "node-service"
+};
+function resolvePreset(name) {
+  if (PRESETS[name]) return name;
+  if (PRESET_ALIASES[name]) return PRESET_ALIASES[name];
+  return void 0;
+}
 var PRESET_INFO = {
   "ts-lib": "TypeScript library \u2014 dual ESM/CJS, tsup, Vitest, ESLint.",
   "js-lib": "JavaScript (ESM) library \u2014 tsup, Vitest, ESLint.",
@@ -1926,9 +2015,9 @@ var PRESET_INFO = {
 
 // src/core/index.js
 function fromPreset(name, overrides = {}) {
-  const preset = PRESETS[name];
-  if (!preset) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(", ")}`);
-  return normalizeConfig({ ...preset, ...overrides });
+  const canonical = resolvePreset(name);
+  if (!canonical) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(", ")}`);
+  return normalizeConfig({ ...PRESETS[canonical], ...overrides });
 }
 function generate(input) {
   const cfg = normalizeConfig(input);
@@ -1982,10 +2071,12 @@ export {
   GROUPS,
   OPTIONS,
   PRESETS,
+  PRESET_ALIASES,
   PRESET_INFO,
   PRESET_NAMES,
   defaultConfig,
   fromPreset,
   generate,
-  normalizeConfig
+  normalizeConfig,
+  resolvePreset
 };

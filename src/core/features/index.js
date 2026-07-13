@@ -12,6 +12,8 @@ import lint from './lint.js';
 import githooks from './githooks.js';
 import release from './release.js';
 import cli from './cli.js';
+import checks from './checks.js';
+import jsr from './jsr.js';
 import workflows from './workflows.js';
 import storybook from './storybook.js';
 import community from './community.js';
@@ -31,6 +33,8 @@ export default [
   githooks,
   release,
   cli,
+  checks,
+  jsr,
   workflows,
   storybook,
   community,

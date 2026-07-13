@@ -1,0 +1,43 @@
+# Packkit (create-packkit)
+
+> A highly configurable, non-interactive scaffolder for modern npm packages, CLIs, HTTP services, and front-end apps (React/Vue/Svelte). Designed to be driven by humans OR automation/agents.
+
+Packkit generates a complete, ready-to-ship project from a single deterministic command. It is safe for agents to call because every option is a flag — no prompts are required when a name and flags (or a preset) are given.
+
+## For agents: how to use it
+
+Introspect the full interface (all options, presets, aliases) as JSON:
+
+```sh
+npx create-packkit --schema
+```
+
+Generate non-interactively (no prompts; `--no-install`/`--no-git` for a pure file scaffold):
+
+```sh
+npx create-packkit <name> [preset] [--flags...]
+```
+
+Examples:
+
+```sh
+npx create-packkit my-lib ts-lib
+npx create-packkit my-cli cli --pm pnpm
+npx create-packkit ui react-lib --storybook
+npx create-packkit api node-service
+npx create-packkit web react-app
+npx create-packkit lib my-lib --no-install --no-git
+```
+
+## Presets (and short aliases)
+
+`ts-lib` (`lib`) · `js-lib` (`jslib`) · `ts-cli` / `cli` · `react-lib` (`rlib`) · `react-app` (`rapp`) · `vue-lib` (`vlib`) · `vue-app` (`vapp`) · `svelte-lib` (`slib`) · `svelte-app` (`sapp`) · `node-service` (`svc`) · `oss` · `minimal` · `full`
+
+## Key flags
+
+`--language ts|js` · `--framework none|react|vue|svelte` · `--target library|cli|service|app` (repeatable) · `--module esm|cjs|dual` · `--bundler tsup|tsdown|unbuild|rollup|none` · `--minify` · `--test vitest|jest|node|none` · `--lint eslint-prettier|biome|oxlint|none` · `--hooks ...` · `--release changesets|release-it|np|none` · `--workflows ci|npm-publish|pages|codeql|codecov|stale` (repeatable) · `--pkg-checks` (publint + are-the-types-wrong) · `--knip` · `--jsr` · `--deps renovate|dependabot|none` · `--license MIT|Apache-2.0|ISC|none` · `--pm npm|pnpm|yarn|bun` · `--from <file>` (load a JSON profile) · `--no-install` · `--no-git`
+
+## Links
+- Web configurator: https://danmat.github.io/create-packkit/
+- Repo: https://github.com/DanMat/create-packkit
+- npm: https://www.npmjs.com/package/create-packkit

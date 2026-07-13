@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { PRESET_NAMES } from '../core/presets.js';
+import { resolvePreset } from '../core/presets.js';
 
 // Map friendly flag names to config keys for non-interactive use.
 const OVERRIDE_FLAGS = {
@@ -17,6 +17,7 @@ const OVERRIDE_FLAGS = {
   node: 'nodeVersion',
   author: 'author',
   description: 'description',
+  repo: 'repo',
 };
 
 // Boolean options that default ON — a --no-<flag> turns them off.
@@ -45,8 +46,12 @@ export function parseCliArgs(argv) {
       workflows: { type: 'string', multiple: true },
       minify: { type: 'boolean' },
       storybook: { type: 'boolean' },
+      'pkg-checks': { type: 'boolean' },
+      knip: { type: 'boolean' },
+      jsr: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
+      schema: { type: 'boolean' },
       ...Object.fromEntries(Object.keys(OVERRIDE_FLAGS).map((k) => [k, { type: 'string' }])),
       ...Object.fromEntries(Object.keys(NEGATABLE).map((k) => [k, { type: 'boolean' }])),
     },
@@ -55,7 +60,7 @@ export function parseCliArgs(argv) {
   // First positional may be a known preset; otherwise it's the project name.
   let preset = values.preset;
   const pos = [...positionals];
-  if (!preset && pos.length && PRESET_NAMES.includes(pos[0])) preset = pos.shift();
+  if (!preset && pos.length && resolvePreset(pos[0])) preset = pos.shift();
   const name = values.name || pos[0];
 
   const overrides = {};
@@ -66,6 +71,9 @@ export function parseCliArgs(argv) {
   if (values.workflows) overrides.workflows = values.workflows;
   if (values.minify) overrides.minify = true;
   if (values.storybook) overrides.storybook = true;
+  if (values['pkg-checks']) overrides.pkgChecks = true;
+  if (values.knip) overrides.knip = true;
+  if (values.jsr) overrides.jsr = true;
   for (const [flag, key] of Object.entries(NEGATABLE)) {
     if (values[flag]) overrides[key] = false;
   }
@@ -81,6 +89,7 @@ export function parseCliArgs(argv) {
     git: !values['no-git'],
     help: !!values.help,
     version: !!values.version,
+    schema: !!values.schema,
     overrides,
   };
 }

@@ -20,16 +20,19 @@ export default {
       pkg.files = ['dist'];
       const esm = './dist/index.js';
       const cjs = './dist/index.cjs';
-      const dts = './dist/index.d.ts';
+      const dtsEsm = './dist/index.d.ts';
+      // Dual builds emit a separate .d.cts so CJS consumers resolve the right
+      // types under the "require" condition (publint / are-the-types-wrong).
+      const dtsCjs = cfg.moduleFormat === 'dual' ? './dist/index.d.cts' : dtsEsm;
+
       const exp = {};
-      if (cfg.isTs) exp.types = dts;
-      if (cfg.hasEsm) exp.import = esm;
-      if (cfg.hasCjs) exp.require = build ? cjs : './dist/index.cjs';
+      if (cfg.hasEsm) exp.import = cfg.isTs ? { types: dtsEsm, default: esm } : esm;
+      if (cfg.hasCjs) exp.require = cfg.isTs ? { types: dtsCjs, default: cjs } : cjs;
       pkg.exports = { '.': exp };
-      if (cfg.hasCjs) pkg.main = exp.require;
-      else pkg.main = esm;
+
+      pkg.main = cfg.hasCjs ? cjs : esm;
       if (cfg.hasEsm) pkg.module = esm;
-      if (cfg.isTs) pkg.types = dts;
+      if (cfg.isTs) pkg.types = cfg.hasEsm ? dtsEsm : dtsCjs;
     }
 
     // ---- build tooling ----

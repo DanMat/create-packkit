@@ -23,6 +23,7 @@ export const PRESETS = {
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
     release: 'changesets', workflows: ['ci', 'npm-publish', 'codeql', 'codecov'],
     deps: 'renovate', community: true, agents: true, vscode: true,
+    pkgChecks: true, knip: true,
   },
   minimal: {
     language: 'ts', target: ['library'], moduleFormat: 'dual', bundler: 'tsup',
@@ -39,6 +40,27 @@ export const PRESETS = {
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
+
+// Short shortcuts, e.g. `npx create-packkit lib my-lib`.
+export const PRESET_ALIASES = {
+  lib: 'ts-lib',
+  jslib: 'js-lib',
+  rlib: 'react-lib',
+  rapp: 'react-app',
+  vlib: 'vue-lib',
+  vapp: 'vue-app',
+  slib: 'svelte-lib',
+  sapp: 'svelte-app',
+  svc: 'node-service',
+  service: 'node-service',
+};
+
+/** Resolve a preset name or alias to its canonical preset id (or undefined). */
+export function resolvePreset(name) {
+  if (PRESETS[name]) return name;
+  if (PRESET_ALIASES[name]) return PRESET_ALIASES[name];
+  return undefined;
+}
 
 // Short gists for the CLI help and the web configurator (tooltips + description).
 export const PRESET_INFO = {

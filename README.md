@@ -53,6 +53,17 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 
 **Team profiles:** save a partial config as `packkit.config.json` (or any file) and reuse it with `npx create-packkit my-lib --from ./packkit.config.json` — flags still override the file.
 
+## For AI agents & automation
+
+Packkit is safe to drive non-interactively — every option is a flag, so no prompts are needed. Agents can introspect the whole interface as JSON:
+
+```sh
+npx create-packkit --schema      # all options, presets, and aliases as JSON
+npx create-packkit my-lib ts-lib --no-install --no-git   # deterministic scaffold
+```
+
+There's also an [`llms.txt`](llms.txt) (served at [danmat.github.io/create-packkit/llms.txt](https://danmat.github.io/create-packkit/llms.txt)) describing the commands for LLMs.
+
 ## How it works
 
 Packkit is a pure `config → { files }` **core** that runs in both Node and the browser:

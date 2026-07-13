@@ -72,7 +72,9 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.isTs) jobs.push(`      - run: ${pmRun(cfg, 'typecheck')}`);
   if (cfg.lint !== 'none') jobs.push(`      - run: ${pmRun(cfg, 'lint')}`);
   if (cfg.test !== 'none') jobs.push(`      - run: ${pmRun(cfg, codecov ? 'coverage' : 'test')}`);
+  if (cfg.knip) jobs.push(`      - run: ${pmRun(cfg, 'knip')}`);
   if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, 'build')}`);
+  if (cfg.pkgChecks) jobs.push(`      - run: ${pmRun(cfg, 'check:pkg')}`); // after build (attw packs dist)
   const cov = codecov
     ? '\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}'
     : '';
@@ -85,6 +87,7 @@ function ciWorkflow(cfg, codecov) {
     'jobs:',
     '  ci:',
     '    runs-on: ubuntu-latest',
+    '    steps:',
     setupSteps(cfg),
     jobs.join('\n') + cov,
     '',
@@ -106,6 +109,7 @@ function releaseWorkflow(cfg) {
       'jobs:',
       '  release:',
       '    runs-on: ubuntu-latest',
+      '    steps:',
       setupSteps(cfg),
       '      - uses: changesets/action@v1',
       '        with:',
@@ -130,6 +134,7 @@ function releaseWorkflow(cfg) {
     'jobs:',
     '  publish:',
     '    runs-on: ubuntu-latest',
+    '    steps:',
     setupSteps(cfg),
     cfg.hasBuild ? `      - run: ${pmRun(cfg, 'build')}` : null,
     '      - run: npm publish --provenance --access public',
