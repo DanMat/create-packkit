@@ -18,6 +18,7 @@ export const PRESETS = {
     test: 'vitest', lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
     release: 'none', workflows: ['ci'], deps: 'renovate', agents: true, vscode: true,
   },
+  monorepo: { monorepo: true, language: 'ts', packageManager: 'pnpm' },
   oss: {
     language: 'ts', target: ['library'], moduleFormat: 'dual', bundler: 'tsup',
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
@@ -76,6 +77,7 @@ export const PRESET_INFO = {
   'svelte-lib': 'Svelte component library — ships source, peer svelte, jsdom tests.',
   'svelte-app': 'Svelte SPA — Vite dev server, build, Testing Library.',
   'node-service': 'Node HTTP service (Hono) — tsx dev, tsup build, Dockerfile.',
+  monorepo: 'pnpm + Turborepo workspace — two example packages, Changesets, CI.',
   oss: 'Full open-source library — coverage, CodeQL, Codecov, Renovate, Changesets.',
   minimal: 'Bare TS library — tsup only, no tests/lint/CI.',
   full: 'Everything on — library + CLI, all workflows and extras.',

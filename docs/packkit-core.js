@@ -40,6 +40,12 @@ var OPTIONS = {
       { value: "app", label: "App (Vite SPA)" }
     ]
   },
+  monorepo: {
+    group: "core",
+    type: "boolean",
+    label: "Monorepo (pnpm/Turborepo workspace)",
+    default: false
+  },
   framework: {
     group: "core",
     type: "select",
@@ -244,6 +250,7 @@ function normalizeConfig(input = {}) {
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+  if (cfg.monorepo) cfg.hasBuild = true;
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   if (!cfg.publishable) cfg.pkgChecks = false;
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
@@ -1900,6 +1907,220 @@ var features_default = [
   gitfiles_default
 ];
 
+// src/core/monorepo.js
+function buildMonorepo(cfg) {
+  const files = {};
+  const pm = cfg.packageManager;
+  const scope = cfg.name.replace(/^@/, "").split("/")[0];
+  const core = `@${scope}/core`;
+  const utils = `@${scope}/utils`;
+  const wsProto = pm === "pnpm" ? "workspace:*" : "*";
+  for (const feat of [community_default, agents_default, gitfiles_default]) {
+    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
+  }
+  const rootPkg = {
+    name: cfg.name,
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    ...cfg.license !== "none" ? { license: cfg.license } : {},
+    ...pm === "pnpm" ? { packageManager: "pnpm@9.10.0" } : { workspaces: ["packages/*"] },
+    scripts: {
+      build: "turbo build",
+      test: "turbo test",
+      lint: "turbo lint",
+      typecheck: "turbo typecheck",
+      dev: "turbo dev",
+      changeset: "changeset",
+      version: "changeset version",
+      release: "turbo build && changeset publish"
+    },
+    devDependencies: {
+      turbo: "^2.0.0",
+      typescript: "^5.5.0",
+      tsup: "^8.0.0",
+      vitest: "^2.0.0",
+      eslint: "^9.0.0",
+      "@eslint/js": "^9.0.0",
+      "typescript-eslint": "^8.0.0",
+      prettier: "^3.3.0",
+      "@changesets/cli": "^2.27.0",
+      "@types/node": `^${cfg.nodeVersion}.0.0`
+    }
+  };
+  files["package.json"] = toJson(rootPkg);
+  if (pm === "pnpm") files["pnpm-workspace.yaml"] = 'packages:\n  - "packages/*"\n';
+  files["turbo.json"] = toJson({
+    $schema: "https://turbo.build/schema.json",
+    tasks: {
+      build: { dependsOn: ["^build"], outputs: ["dist/**"] },
+      test: { dependsOn: ["^build"] },
+      typecheck: { dependsOn: ["^build"] },
+      lint: {},
+      dev: { cache: false, persistent: true }
+    }
+  });
+  files["tsconfig.base.json"] = toJson({
+    $schema: "https://json.schemastore.org/tsconfig",
+    compilerOptions: {
+      target: "ES2022",
+      module: "ESNext",
+      moduleResolution: "Bundler",
+      lib: ["ES2022"],
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      declaration: true,
+      noEmit: true
+    }
+  });
+  files[".changeset/config.json"] = toJson({
+    $schema: "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+    changelog: "@changesets/cli/changelog",
+    commit: false,
+    access: "public",
+    baseBranch: "main"
+  });
+  files[".changeset/README.md"] = "# Changesets\n\nRun `npx changeset` to record a version bump for your next release.\n";
+  files["eslint.config.js"] = [
+    `import js from '@eslint/js';`,
+    `import tseslint from 'typescript-eslint';`,
+    ``,
+    `export default tseslint.config(`,
+    `	js.configs.recommended,`,
+    `	...tseslint.configs.recommended,`,
+    `	{ ignores: ['**/dist'] },`,
+    `);`,
+    ``
+  ].join("\n");
+  files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
+  files["README.md"] = rootReadme(cfg, pm, core, utils);
+  files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, pm);
+  addPackage(files, {
+    name: core,
+    dir: "packages/core",
+    src: [
+      `/** Greet someone by name. */`,
+      `export function greet(name: string): string {`,
+      `	return \`Hello, \${name}!\`;`,
+      `}`,
+      ``
+    ].join("\n"),
+    test: exampleTest2(`import { greet } from './index.js';`, `expect(greet('world')).toBe('Hello, world!')`),
+    deps: {}
+  });
+  addPackage(files, {
+    name: utils,
+    dir: "packages/utils",
+    src: [
+      `import { greet } from '${core}';`,
+      ``,
+      `/** Greet someone, loudly. */`,
+      `export function shout(name: string): string {`,
+      `	return greet(name).toUpperCase();`,
+      `}`,
+      ``
+    ].join("\n"),
+    test: exampleTest2(`import { shout } from './index.js';`, `expect(shout('world')).toBe('HELLO, WORLD!')`),
+    deps: { [core]: wsProto }
+  });
+  const install = pm === "npm" ? "npm install" : `${pm} install`;
+  return {
+    config: cfg,
+    files,
+    postCommands: cfg.gitInit ? ["git init", "git add -A", 'git commit -m "Initial commit from Packkit"'] : [],
+    summary: {
+      name: cfg.name,
+      fileCount: Object.keys(files).length,
+      stack: ["monorepo", `${pm}+turbo`, "TypeScript", "tsup", "vitest", "changesets"],
+      workflows: ["ci"]
+    }
+  };
+}
+function addPackage(files, { name, dir, src, test, deps }) {
+  const pkg = {
+    name,
+    version: "0.0.0",
+    type: "module",
+    main: "./dist/index.js",
+    types: "./dist/index.d.ts",
+    exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" } },
+    files: ["dist"],
+    scripts: {
+      build: "tsup src/index.ts --format esm --dts --clean",
+      dev: "tsup src/index.ts --format esm --dts --watch",
+      test: "vitest run",
+      typecheck: "tsc --noEmit",
+      lint: "eslint ."
+    },
+    ...Object.keys(deps).length ? { dependencies: deps } : {}
+  };
+  files[`${dir}/package.json`] = toJson(pkg);
+  files[`${dir}/tsconfig.json`] = toJson({ extends: "../../tsconfig.base.json", include: ["src"] });
+  files[`${dir}/src/index.ts`] = src;
+  files[`${dir}/src/index.test.ts`] = test;
+}
+function exampleTest2(importLine, assertion) {
+  return [`import { describe, it, expect } from 'vitest';`, importLine, ``, `describe('example', () => {`, `	it('works', () => {`, `		${assertion};`, `	});`, `});`, ``].join("\n");
+}
+function ciWorkflow2(cfg, pm) {
+  const setup = ["      - uses: actions/checkout@v4"];
+  if (pm === "pnpm") setup.push("      - uses: pnpm/action-setup@v4");
+  setup.push(
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    `          node-version: '${cfg.nodeVersion}'`,
+    `          cache: '${pm === "yarn" ? "yarn" : pm === "pnpm" ? "pnpm" : "npm"}'`
+  );
+  const install = pm === "npm" ? "npm ci" : pm === "pnpm" ? "pnpm install --frozen-lockfile" : `${pm} install --frozen-lockfile`;
+  const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
+  return [
+    "name: CI",
+    "on:",
+    "  push:",
+    "    branches: [main]",
+    "  pull_request:",
+    "jobs:",
+    "  ci:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    setup.join("\n"),
+    `      - run: ${install}`,
+    `      - run: ${run2("typecheck")}`,
+    `      - run: ${run2("lint")}`,
+    `      - run: ${run2("test")}`,
+    `      - run: ${run2("build")}`,
+    ""
+  ].join("\n");
+}
+function rootReadme(cfg, pm, core, utils) {
+  const install = pm === "npm" ? "npm install" : `${pm} install`;
+  const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
+  return [
+    `# ${cfg.name}`,
+    "",
+    cfg.description || "_A monorepo scaffolded with [Packkit](https://danmat.github.io/create-packkit/)._",
+    "",
+    "## Packages",
+    "",
+    `- \`${core}\` \u2014 the core library`,
+    `- \`${utils}\` \u2014 utilities built on \`${core}\``,
+    "",
+    "## Develop",
+    "",
+    "```sh",
+    install,
+    run2("build") + "     # build all packages (Turborepo)",
+    run2("test"),
+    "```",
+    "",
+    cfg.license !== "none" ? `## License
+
+${cfg.license}${cfg.author ? " \xA9 " + cfg.author : ""}
+` : ""
+  ].join("\n");
+}
+
 // src/core/presets.js
 var PRESETS = {
   "ts-lib": { language: "ts", target: ["library"], moduleFormat: "dual" },
@@ -1927,6 +2148,7 @@ var PRESETS = {
     agents: true,
     vscode: true
   },
+  monorepo: { monorepo: true, language: "ts", packageManager: "pnpm" },
   oss: {
     language: "ts",
     target: ["library"],
@@ -2008,6 +2230,7 @@ var PRESET_INFO = {
   "svelte-lib": "Svelte component library \u2014 ships source, peer svelte, jsdom tests.",
   "svelte-app": "Svelte SPA \u2014 Vite dev server, build, Testing Library.",
   "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
+  monorepo: "pnpm + Turborepo workspace \u2014 two example packages, Changesets, CI.",
   oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
   minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",
   full: "Everything on \u2014 library + CLI, all workflows and extras."
@@ -2021,6 +2244,7 @@ function fromPreset(name, overrides = {}) {
 }
 function generate(input) {
   const cfg = normalizeConfig(input);
+  if (cfg.monorepo) return buildMonorepo(cfg);
   const files = {};
   let pkg = {};
   for (const feat of features_default) {

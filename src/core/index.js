@@ -6,6 +6,7 @@ import { normalizeConfig, OPTIONS, GROUPS, defaultConfig } from './options.js';
 import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
+import { buildMonorepo } from './monorepo.js';
 import { PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset } from './presets.js';
 
 export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
@@ -20,6 +21,8 @@ export function fromPreset(name, overrides = {}) {
 /** Turn a config into a complete set of files. */
 export function generate(input) {
   const cfg = normalizeConfig(input);
+  if (cfg.monorepo) return buildMonorepo(cfg);
+
   const files = {};
   let pkg = {};
 

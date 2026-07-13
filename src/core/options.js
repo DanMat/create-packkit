@@ -37,6 +37,9 @@ export const OPTIONS = {
       { value: 'app', label: 'App (Vite SPA)' },
     ],
   },
+  monorepo: {
+    group: 'core', type: 'boolean', label: 'Monorepo (pnpm/Turborepo workspace)', default: false,
+  },
   framework: {
     group: 'core', type: 'select', label: 'Framework', default: 'none',
     choices: [
@@ -239,6 +242,9 @@ export function normalizeConfig(input = {}) {
 
   // Storybook only applies to component libraries.
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+
+  // A monorepo is its own generation path (see buildMonorepo); it has a build.
+  if (cfg.monorepo) cfg.hasBuild = true;
 
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   // Package-correctness checks only make sense for a publishable package.

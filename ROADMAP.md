@@ -19,7 +19,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 **On defaults:** we keep **tsup + ESLint/Prettier + Vitest + Changesets** as the conservative, best-supported defaults. `tsdown`, `Biome`, and `oxlint` are one click away for those who want them — we'll revisit the defaults as those tools' ecosystems mature.
 
 ## Next up
-- [ ] **Monorepo target** — pnpm/turbo workspaces with multiple packages.
+- [x] ~~**Monorepo target** — pnpm/turbo workspaces with multiple packages.~~ **Shipped** (`monorepo` preset).
 - [ ] **Vue/Svelte app scaffolds with a router** (currently minimal SPAs).
 - [ ] **Multiple entry points** — `exports` subpaths and per-entry builds.
 - [ ] **E2E option** — Playwright for apps.

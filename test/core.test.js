@@ -111,6 +111,21 @@ test('generated workflows are well-formed (steps: present under each job)', () =
   }
 });
 
+test('monorepo: pnpm/turbo workspace with two linked packages', () => {
+  const out = generate(fromPreset('monorepo', { name: 'acme' }));
+  assert.ok(out.files['turbo.json']);
+  assert.ok(out.files['pnpm-workspace.yaml']);
+  assert.ok(out.files['packages/core/package.json']);
+  assert.ok(out.files['packages/utils/package.json']);
+  const root = JSON.parse(out.files['package.json']);
+  assert.equal(root.private, true);
+  assert.match(root.scripts.build, /turbo/);
+  // utils depends on core via the workspace protocol
+  const utils = JSON.parse(out.files['packages/utils/package.json']);
+  assert.equal(utils.dependencies['@acme/core'], 'workspace:*');
+  assert.match(out.files['packages/utils/src/index.ts'], /@acme\/core/);
+});
+
 test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });
