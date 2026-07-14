@@ -41,6 +41,12 @@ jobs:
           - full
           - minimal
           - react-lib --storybook
+          - ts-lib --lint biome
+          - ts-lib --lint oxlint
+          - ts-lib --test jest
+          - ts-lib --bundler rollup
+          - ts-lib --bundler unbuild
+          - cli --hooks lefthook
     name: ${{ matrix.preset }}
     steps:
       - uses: actions/checkout@v4

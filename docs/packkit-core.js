@@ -1092,13 +1092,13 @@ var lint_default = {
       pkg.devDependencies.oxlint = "^1.0.0";
     } else if (cfg.lint === "biome") {
       files["biome.json"] = toJson({
-        $schema: "https://biomejs.dev/schemas/2.0.0/schema.json",
+        $schema: "https://biomejs.dev/schemas/2.1.2/schema.json",
         formatter: { enabled: true, indentStyle: "tab", lineWidth: 100 },
-        linter: { enabled: true, rules: { recommended: true } },
+        linter: { enabled: true },
         javascript: { formatter: { quoteStyle: "single", trailingCommas: "all" } }
       });
-      pkg.scripts.lint = "biome check .";
-      pkg.scripts["lint:fix"] = "biome check --write .";
+      pkg.scripts.lint = "biome lint .";
+      pkg.scripts["lint:fix"] = "biome lint --write .";
       pkg.scripts.format = "biome format --write .";
       pkg.devDependencies["@biomejs/biome"] = "^2.0.0";
     }
