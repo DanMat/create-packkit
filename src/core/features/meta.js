@@ -1,5 +1,11 @@
 // Always-on: base package.json descriptive fields + the source entry + README.
 
+// The real minimum patch for each major, driven by our template deps (eslint 10,
+// jsdom 29, vite 8 need ^20.19; vite/others need ^22.12). `>=20` would be a lie —
+// a user on 20.17 hits EBADENGINE and transitive syntax errors. Keep this honest.
+export const NODE_FLOOR = { 18: '18.18.0', 20: '20.19.0', 22: '22.12.0', 24: '24.0.0' };
+const nodeFloor = (v) => NODE_FLOOR[v] || `${v}.0.0`;
+
 export default {
   id: 'meta',
   active: () => true,
@@ -10,7 +16,7 @@ export default {
       version: '0.0.0',
       description: cfg.description || '',
       type: cfg.moduleFormat === 'cjs' ? 'commonjs' : 'module',
-      engines: { node: `>=${cfg.nodeVersion}` },
+      engines: { node: `>=${nodeFloor(cfg.nodeVersion)}` },
       scripts: {},
     };
 
@@ -33,8 +39,8 @@ export default {
     // README
     files['README.md'] = readme(cfg);
 
-    // Node version pin
-    files['.nvmrc'] = `${cfg.nodeVersion}\n`;
+    // Node version pin — the honest floor, so `nvm use` can't land below it.
+    files['.nvmrc'] = `${nodeFloor(cfg.nodeVersion)}\n`;
 
     // A typecheck script for TS projects — framework-aware (plain tsc can't
     // resolve .vue/.svelte modules).

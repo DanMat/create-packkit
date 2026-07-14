@@ -61,9 +61,9 @@ export const OPTIONS = {
   nodeVersion: {
     group: 'core', type: 'select', label: 'Node version', default: '20',
     choices: [
-      { value: '18', label: '18 (LTS)' },
-      { value: '20', label: '20 (LTS)' },
-      { value: '22', label: '22 (LTS)' },
+      { value: '20', label: '20 (LTS, ≥20.19)' },
+      { value: '22', label: '22 (LTS, ≥22.12)' },
+      { value: '24', label: '24 (Current)' },
     ],
   },
 

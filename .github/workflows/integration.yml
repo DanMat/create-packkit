@@ -53,9 +53,12 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9
+      # Pin to the exact minimum Node we advertise (engines floor), NOT '20'
+      # (which floats to the latest 20.x and hides sub-floor breakage — this is
+      # what let a Node-20.17 failure ship). Generated projects claim >=20.19.0.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: npm
       - run: npm ci
       - run: node scripts/integration.mjs ${{ matrix.preset }}

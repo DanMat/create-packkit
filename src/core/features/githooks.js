@@ -34,7 +34,9 @@ export default {
 
     if (needsLintStaged) {
       pkg['lint-staged'] = staged;
-      pkg.devDependencies['lint-staged'] = '^17.0.0';
+      // Held at 16: v17 requires Node >=22.22.1, which would silently drop
+      // Node 20 LTS support for every generated project. See NODE_FLOOR.
+      pkg.devDependencies['lint-staged'] = '^16.2.0';
     }
 
     return { files, pkg };

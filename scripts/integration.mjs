@@ -63,6 +63,31 @@ for (const s of ['typecheck', 'lint', 'build', 'test', 'build-storybook']) {
   }
 }
 
+// 3b) dev/watch smoke — the `dev` (tsup/tsdown/tsc --watch, vite) scripts are
+// the first thing users run, and the matrix never exercised them because watch
+// mode doesn't exit. Start it, give it time for the first build/boot, and fail
+// if it crashes or logs a build error (this is exactly the Node-floor crash we
+// missed). "still alive after the settle window" == healthy.
+if (scripts.dev) {
+  console.log(`\n$ ${pm} run dev  (watch smoke)`);
+  const child = spawn(pm, ['run', 'dev'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  let exited = null;
+  child.stdout.on('data', (d) => { out += d; process.stdout.write(d); });
+  child.stderr.on('data', (d) => { out += d; process.stderr.write(d); });
+  child.on('exit', (code) => { exited = code ?? 0; });
+  for (let i = 0; i < 24 && exited === null; i++) await new Promise((r) => setTimeout(r, 500));
+  const crashed = exited !== null && exited !== 0;
+  const errored = /SyntaxError|ELIFECYCLE|Cannot find module|error TS\d|Build failed|✘ \[ERROR\]/i.test(out);
+  try { process.kill(-child.pid); } catch { try { child.kill(); } catch { /* already gone */ } }
+  if (crashed || errored) {
+    console.error(`\n✗ [${label}] "dev" watch ${crashed ? `exited ${exited}` : 'logged a build error'}`);
+    process.exit(1);
+  }
+  console.log('✓ dev watch started cleanly');
+  await new Promise((r) => setTimeout(r, 500)); // free the port before the service check
+}
+
 // 4) services: prove the built server actually starts and responds
 if (scripts.start && pkg.dependencies && pkg.dependencies.hono) {
   console.log('\n$ node dist/index.js  (checking /health)');

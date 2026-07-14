@@ -76,9 +76,9 @@ var OPTIONS = {
     label: "Node version",
     default: "20",
     choices: [
-      { value: "18", label: "18 (LTS)" },
-      { value: "20", label: "20 (LTS)" },
-      { value: "22", label: "22 (LTS)" }
+      { value: "20", label: "20 (LTS, \u226520.19)" },
+      { value: "22", label: "22 (LTS, \u226522.12)" },
+      { value: "24", label: "24 (Current)" }
     ]
   },
   // ---- build ----
@@ -326,6 +326,8 @@ function sortKeys(obj) {
 }
 
 // src/core/features/meta.js
+var NODE_FLOOR = { 18: "18.18.0", 20: "20.19.0", 22: "22.12.0", 24: "24.0.0" };
+var nodeFloor = (v) => NODE_FLOOR[v] || `${v}.0.0`;
 var meta_default = {
   id: "meta",
   active: () => true,
@@ -336,7 +338,7 @@ var meta_default = {
       version: "0.0.0",
       description: cfg.description || "",
       type: cfg.moduleFormat === "cjs" ? "commonjs" : "module",
-      engines: { node: `>=${cfg.nodeVersion}` },
+      engines: { node: `>=${nodeFloor(cfg.nodeVersion)}` },
       scripts: {}
     };
     const kw = String(cfg.keywords || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -352,7 +354,7 @@ var meta_default = {
       files[`src/index.${cfg.ext}`] = libraryEntry(cfg);
     }
     files["README.md"] = readme(cfg);
-    files[".nvmrc"] = `${cfg.nodeVersion}
+    files[".nvmrc"] = `${nodeFloor(cfg.nodeVersion)}
 `;
     if (cfg.isTs) {
       pkg.scripts.typecheck = cfg.isVue ? "vue-tsc --noEmit" : cfg.isSvelte ? "svelte-check --tsconfig ./tsconfig.json" : "tsc --noEmit";
@@ -1162,7 +1164,7 @@ var githooks_default = {
     }
     if (needsLintStaged) {
       pkg["lint-staged"] = staged;
-      pkg.devDependencies["lint-staged"] = "^17.0.0";
+      pkg.devDependencies["lint-staged"] = "^16.2.0";
     }
     return { files, pkg };
   }
