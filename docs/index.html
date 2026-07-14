@@ -93,6 +93,8 @@
       <div class="presets-head">
         <span class="presets-label">Presets</span>
         <span class="presets-desc" id="presetDesc">Quick-start from a common setup — hover for details.</span>
+        <button class="btn ghost" id="import" style="margin-left:auto" title="Prefill from an existing package.json">⇪ Import package.json</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
       </div>
       <div class="presets" id="presets"></div>
     </div>
@@ -105,6 +107,7 @@
     <div class="actions">
       <button class="btn primary" id="download">↓ Download .zip</button>
       <button class="btn ghost" id="copy">Copy command</button>
+      <button class="btn ghost" id="share" title="Copy a link that reopens this exact config">🔗 Share link</button>
     </div>
     <h3>Files <span class="count" id="fileCount"></span></h3>
     <div class="split">

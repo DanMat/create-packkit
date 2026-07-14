@@ -114,6 +114,11 @@ function commandFor(cfg) {
   if (cfg.pkgChecks) parts.push('--pkg-checks');
   if (cfg.knip) parts.push('--knip');
   if (cfg.jsr) parts.push('--jsr');
+  if (cfg.sizeLimit) parts.push('--size-limit');
+  if (cfg.e2e) parts.push('--e2e');
+  if (cfg.env) parts.push('--env');
+  if (cfg.canary) parts.push('--canary');
+  if (cfg.publishable && cfg.sourcemaps === false) parts.push('--no-sourcemaps');
   if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
   if (cfg.monorepo) parts.push('--monorepo');
   for (const b of ['community', 'agents', 'vscode', 'editorconfig']) {
@@ -178,13 +183,75 @@ $('#download').onclick = async () => {
   document.body.append(a); a.click(); a.remove();
 };
 
+function flash(btn, msg) {
+  const t = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => (btn.textContent = t), 1200);
+}
+
 $('#copy').onclick = async () => {
   await navigator.clipboard.writeText($('#cmd').textContent);
-  const btn = $('#copy'); const t = btn.textContent;
-  btn.textContent = 'Copied!'; setTimeout(() => (btn.textContent = t), 1200);
+  flash($('#copy'), 'Copied!');
 };
 
+// ---- import an existing package.json ---------------------------------------
+$('#import').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const pj = JSON.parse(await file.text());
+    if (pj.name) state.name = String(pj.name);
+    if (pj.description) state.description = String(pj.description);
+    if (pj.author) state.author = typeof pj.author === 'string' ? pj.author : (pj.author.name || '');
+    if (pj.type === 'module') state.moduleFormat = 'esm';
+    else if (pj.type === 'commonjs') state.moduleFormat = 'cjs';
+    if (pj.bin && !state.target.includes('cli')) state.target = [...new Set([...state.target, 'cli'])];
+    update();
+    renderForm();
+    flash($('#import'), '✓ Imported');
+  } catch {
+    flash($('#import'), '✗ Invalid JSON');
+  }
+  e.target.value = '';
+};
+
+// ---- share the config as a URL ---------------------------------------------
+// Encode only what differs from the defaults (+ metadata) so links stay short.
+function changedConfig() {
+  const d = defaultConfig();
+  const changed = {};
+  for (const k of Object.keys(OPTIONS)) {
+    if (HIDDEN.has(k)) continue;
+    if (JSON.stringify(state[k]) !== JSON.stringify(d[k])) changed[k] = state[k];
+  }
+  for (const k of ['name', 'description', 'author']) if (state[k]) changed[k] = state[k];
+  return changed;
+}
+
+$('#share').onclick = async () => {
+  const url = location.origin + location.pathname + '?c=' + encodeURIComponent(JSON.stringify(changedConfig()));
+  history.replaceState(null, '', url);
+  await navigator.clipboard.writeText(url);
+  flash($('#share'), 'Link copied!');
+};
+
+function applyFromUrl() {
+  const c = new URLSearchParams(location.search).get('c');
+  if (!c) return;
+  try {
+    const changed = JSON.parse(decodeURIComponent(c));
+    const d = defaultConfig();
+    for (const [k, v] of Object.entries(changed)) {
+      if (k in d || ['name', 'description', 'author'].includes(k)) state[k] = v;
+    }
+  } catch {
+    /* ignore a malformed link */
+  }
+}
+
 // ---- boot ------------------------------------------------------------------
+applyFromUrl();
 renderPresets();
 renderForm();
 // preview the README by default
