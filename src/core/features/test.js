@@ -26,6 +26,9 @@ export default {
         `export default defineConfig({`,
         fw ? `\tplugins: [${fw.call}],` : null,
         `\ttest: {`,
+        // Keep Vitest to unit tests under src/ so it never tries to run the
+        // Playwright specs in e2e/ (they share the *.spec.ts glob).
+        cfg.e2e ? `\t\tinclude: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],` : null,
         cfg.hasFramework ? `\t\tenvironment: 'jsdom',` : null,
         cfg.hasFramework ? `\t\tglobals: true,` : null,
         cfg.coverage ? `\t\tcoverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,

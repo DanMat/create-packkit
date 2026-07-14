@@ -937,6 +937,9 @@ import { svelteTesting } from '@testing-library/svelte/vite';`,
         `export default defineConfig({`,
         fw ? `	plugins: [${fw.call}],` : null,
         `	test: {`,
+        // Keep Vitest to unit tests under src/ so it never tries to run the
+        // Playwright specs in e2e/ (they share the *.spec.ts glob).
+        cfg.e2e ? `		include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],` : null,
         cfg.hasFramework ? `		environment: 'jsdom',` : null,
         cfg.hasFramework ? `		globals: true,` : null,
         cfg.coverage ? `		coverage: { provider: 'v8', reporter: ['text', 'lcov'] },` : null,
