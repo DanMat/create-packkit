@@ -1430,7 +1430,7 @@ var githooks_default = {
       pkg.devDependencies.husky = "^9.1.0";
     } else if (cfg.gitHooks === "lefthook") {
       files["lefthook.yml"] = lefthookYml(cfg, staged);
-      pkg.scripts.prepare = "lefthook install";
+      pkg.scripts.prepare = "lefthook install || true";
       pkg.devDependencies.lefthook = "^2.0.0";
     }
     if (needsLintStaged) {
@@ -1531,7 +1531,8 @@ var checks_default = {
   apply(cfg) {
     const pkg = { scripts: {}, devDependencies: {} };
     if (cfg.pkgChecks) {
-      pkg.scripts["check:pkg"] = "publint && attw --pack";
+      const attw = cfg.moduleFormat === "esm" ? "attw --pack --profile esm-only" : "attw --pack";
+      pkg.scripts["check:pkg"] = `publint && ${attw}`;
       pkg.devDependencies.publint = "^0.3.0";
       pkg.devDependencies["@arethetypeswrong/cli"] = "^0.18.0";
     }
