@@ -20,7 +20,7 @@ export default {
           start: 'node dist/index.js',
           dev: cfg.isTs ? 'tsx watch src/index.ts' : 'node --watch src/index.js',
         },
-        dependencies: { hono: '^4.5.0', '@hono/node-server': '^1.12.0' },
+        dependencies: { hono: '^4.5.0', '@hono/node-server': '^2.0.0' },
         ...(cfg.isTs ? { devDependencies: { tsx: '^4.0.0' } } : {}),
       },
     };

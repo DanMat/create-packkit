@@ -26,15 +26,15 @@ export default {
       files['eslint.config.js'] = eslintFlatConfig(cfg);
       pkg.scripts.lint = 'eslint .';
       pkg.scripts['lint:fix'] = 'eslint . --fix';
-      pkg.devDependencies.eslint = '^9.0.0';
-      pkg.devDependencies['@eslint/js'] = '^9.0.0';
+      pkg.devDependencies.eslint = '^10.0.0';
+      pkg.devDependencies['@eslint/js'] = '^10.0.0';
       if (cfg.isTs) pkg.devDependencies['typescript-eslint'] = '^8.0.0';
     } else if (cfg.lint === 'oxlint') {
       pkg.scripts.lint = 'oxlint';
-      pkg.devDependencies.oxlint = '^0.9.0';
+      pkg.devDependencies.oxlint = '^1.0.0';
     } else if (cfg.lint === 'biome') {
       files['biome.json'] = toJson({
-        $schema: 'https://biomejs.dev/schemas/1.8.0/schema.json',
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
         formatter: { enabled: true, indentStyle: 'tab', lineWidth: 100 },
         linter: { enabled: true, rules: { recommended: true } },
         javascript: { formatter: { quoteStyle: 'single', trailingCommas: 'all' } },
@@ -42,7 +42,7 @@ export default {
       pkg.scripts.lint = 'biome check .';
       pkg.scripts['lint:fix'] = 'biome check --write .';
       pkg.scripts.format = 'biome format --write .';
-      pkg.devDependencies['@biomejs/biome'] = '^1.8.0';
+      pkg.devDependencies['@biomejs/biome'] = '^2.0.0';
     }
 
     return { files, pkg };

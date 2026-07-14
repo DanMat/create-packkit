@@ -48,20 +48,20 @@ export default {
       pkg.devDependencies = { [tool]: tool === 'tsup' ? '^8.0.0' : '^0.6.0' };
       // tsup/tsdown resolve `typescript` even for plain-JS builds; TS projects
       // already get it from the typescript feature.
-      if (!cfg.isTs) pkg.devDependencies.typescript = '^5.5.0';
+      if (!cfg.isTs) pkg.devDependencies.typescript = '^5.9.3';
     } else if (cfg.bundler === 'unbuild') {
       files['build.config.ts'] = unbuildConfig(cfg);
       pkg.scripts.build = 'unbuild';
       pkg.scripts.dev = 'unbuild --stub';
-      pkg.devDependencies = { unbuild: '^2.0.0' };
+      pkg.devDependencies = { unbuild: '^3.0.0' };
     } else if (cfg.bundler === 'rollup') {
       files[`rollup.config.${cfg.ext === 'ts' ? 'ts' : 'js'}`] = rollupConfig(cfg, formats);
       pkg.scripts.build = 'rollup -c';
       pkg.scripts.dev = 'rollup -c -w';
       pkg.devDependencies = {
         rollup: '^4.0.0',
-        ...(cfg.isTs ? { '@rollup/plugin-typescript': '^11.0.0', tslib: '^2.6.0' } : {}),
-        ...(cfg.minify ? { '@rollup/plugin-terser': '^0.4.0' } : {}),
+        ...(cfg.isTs ? { '@rollup/plugin-typescript': '^12.0.0', tslib: '^2.6.0' } : {}),
+        ...(cfg.minify ? { '@rollup/plugin-terser': '^1.0.0' } : {}),
       };
     } else if (cfg.bundler === 'none' && cfg.isTs) {
       // tsc-only build for TypeScript.

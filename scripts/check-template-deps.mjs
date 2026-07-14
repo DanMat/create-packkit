@@ -8,6 +8,12 @@ import { generate, normalizeConfig, fromPreset, PRESET_NAMES } from '../src/core
 
 // Ignore version-pinned-to-something-else or non-semver specifiers.
 const IGNORE = new Set(['@types/node']);
+
+// Intentionally held back for compatibility — reported separately, not as failures.
+const HELD = {
+  typescript: 'typescript-eslint peers typescript <6.1.0 (no TS 7 support yet)',
+  knip: 'v6 crashes on the oxc-parser native binding',
+};
 const isSemverish = (v) => /^[\^~>=]*\d+\.\d+/.test(v) || /^[\^~>=]*\d+$/.test(v);
 const floorMajor = (v) => parseInt(String(v).replace(/^[\^~>=v\s]+/, ''), 10);
 
@@ -58,6 +64,7 @@ async function latest(name) {
 
 const specs = collectDeps();
 const stale = [];
+const held = [];
 const errors = [];
 
 await Promise.all(
@@ -67,7 +74,7 @@ await Promise.all(
     const ours = floorMajor(range);
     const theirs = floorMajor(v);
     if (Number.isFinite(ours) && Number.isFinite(theirs) && theirs > ours) {
-      stale.push({ name, range, latest: v, behind: theirs - ours });
+      (HELD[name] ? held : stale).push({ name, range, latest: v, behind: theirs - ours });
     }
   }),
 );
@@ -77,8 +84,13 @@ stale.sort((a, b) => b.behind - a.behind || a.name.localeCompare(b.name));
 console.log(`Checked ${specs.size} template dependencies against npm.`);
 if (errors.length) console.log(`Could not resolve: ${errors.join(', ')}`);
 
+if (held.length) {
+  console.log(`\nℹ️  Held back on purpose (${held.length}):`);
+  for (const h of held) console.log(`  - \`${h.name}\` @ \`${h.range}\` (latest \`${h.latest}\`) — ${HELD[h.name]}`);
+}
+
 if (stale.length === 0) {
-  console.log('\n✅ All template dependencies are within one major of the latest.');
+  console.log('\n✅ All bumpable template dependencies are within one major of the latest.');
   process.exit(0);
 }
 

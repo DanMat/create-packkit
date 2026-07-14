@@ -29,12 +29,12 @@ export default {
     } else if (cfg.gitHooks === 'lefthook') {
       files['lefthook.yml'] = lefthookYml(cfg, staged);
       pkg.scripts.prepare = 'lefthook install';
-      pkg.devDependencies.lefthook = '^1.7.0';
+      pkg.devDependencies.lefthook = '^2.0.0';
     }
 
     if (needsLintStaged) {
       pkg['lint-staged'] = staged;
-      pkg.devDependencies['lint-staged'] = '^15.2.0';
+      pkg.devDependencies['lint-staged'] = '^17.0.0';
     }
 
     return { files, pkg };

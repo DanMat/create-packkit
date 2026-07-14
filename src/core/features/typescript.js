@@ -41,7 +41,7 @@ export default {
       },
       pkg: {
         devDependencies: {
-          typescript: '^5.5.0',
+          typescript: '^5.9.3',
           '@types/node': `^${cfg.nodeVersion}.0.0`,
         },
       },

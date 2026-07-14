@@ -29,10 +29,10 @@ export default {
         npm: { publish: true },
       });
       pkg.scripts.release = 'release-it';
-      pkg.devDependencies['release-it'] = '^17.0.0';
+      pkg.devDependencies['release-it'] = '^20.0.0';
     } else if (cfg.release === 'np') {
       pkg.scripts.release = 'np';
-      pkg.devDependencies.np = '^10.0.0';
+      pkg.devDependencies.np = '^11.0.0';
     }
 
     return { files, pkg };

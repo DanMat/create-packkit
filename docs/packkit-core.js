@@ -500,20 +500,20 @@ var bundler_default = {
       pkg.scripts.build = tool;
       pkg.scripts.dev = `${tool} --watch`;
       pkg.devDependencies = { [tool]: tool === "tsup" ? "^8.0.0" : "^0.6.0" };
-      if (!cfg.isTs) pkg.devDependencies.typescript = "^5.5.0";
+      if (!cfg.isTs) pkg.devDependencies.typescript = "^5.9.3";
     } else if (cfg.bundler === "unbuild") {
       files["build.config.ts"] = unbuildConfig(cfg);
       pkg.scripts.build = "unbuild";
       pkg.scripts.dev = "unbuild --stub";
-      pkg.devDependencies = { unbuild: "^2.0.0" };
+      pkg.devDependencies = { unbuild: "^3.0.0" };
     } else if (cfg.bundler === "rollup") {
       files[`rollup.config.${cfg.ext === "ts" ? "ts" : "js"}`] = rollupConfig(cfg, formats);
       pkg.scripts.build = "rollup -c";
       pkg.scripts.dev = "rollup -c -w";
       pkg.devDependencies = {
         rollup: "^4.0.0",
-        ...cfg.isTs ? { "@rollup/plugin-typescript": "^11.0.0", tslib: "^2.6.0" } : {},
-        ...cfg.minify ? { "@rollup/plugin-terser": "^0.4.0" } : {}
+        ...cfg.isTs ? { "@rollup/plugin-typescript": "^12.0.0", tslib: "^2.6.0" } : {},
+        ...cfg.minify ? { "@rollup/plugin-terser": "^1.0.0" } : {}
       };
     } else if (cfg.bundler === "none" && cfg.isTs) {
       pkg.scripts.build = "tsc";
@@ -614,7 +614,7 @@ var typescript_default = {
       },
       pkg: {
         devDependencies: {
-          typescript: "^5.5.0",
+          typescript: "^5.9.3",
           "@types/node": `^${cfg.nodeVersion}.0.0`
         }
       }
@@ -714,7 +714,7 @@ function svelte(cfg, files, pkg, forApp) {
 
 export default { preprocess: vitePreprocess() };
 `;
-  pkg.devDependencies["@sveltejs/vite-plugin-svelte"] = "^4.0.0";
+  pkg.devDependencies["@sveltejs/vite-plugin-svelte"] = "^7.0.0";
   if (cfg.isTs) pkg.devDependencies["svelte-check"] = "^4.0.0";
   if (forApp) {
     files["index.html"] = htmlShell(cfg, `/src/main.${cfg.ext}`);
@@ -768,19 +768,19 @@ function htmlShell(cfg, entry) {
 
 // src/core/features/vite.js
 var PLUGIN = {
-  react: { import: `import react from '@vitejs/plugin-react';`, call: "react()", dep: { "@vitejs/plugin-react": "^4.3.0" } },
-  vue: { import: `import vue from '@vitejs/plugin-vue';`, call: "vue()", dep: { "@vitejs/plugin-vue": "^5.1.0" } },
-  svelte: { import: `import { svelte } from '@sveltejs/vite-plugin-svelte';`, call: "svelte()", dep: { "@sveltejs/vite-plugin-svelte": "^4.0.0" } }
+  react: { import: `import react from '@vitejs/plugin-react';`, call: "react()", dep: { "@vitejs/plugin-react": "^6.0.0" } },
+  vue: { import: `import vue from '@vitejs/plugin-vue';`, call: "vue()", dep: { "@vitejs/plugin-vue": "^6.0.0" } },
+  svelte: { import: `import { svelte } from '@sveltejs/vite-plugin-svelte';`, call: "svelte()", dep: { "@sveltejs/vite-plugin-svelte": "^7.0.0" } }
 };
 var vite_default = {
   id: "vite",
   active: (cfg) => cfg.viteBuild,
   apply(cfg) {
     const files = {};
-    const pkg = { scripts: {}, devDependencies: { vite: "^5.4.0" } };
+    const pkg = { scripts: {}, devDependencies: { vite: "^8.0.0" } };
     const p = PLUGIN[cfg.framework];
     Object.assign(pkg.devDependencies, p.dep);
-    if (cfg.isVue && cfg.isTs) pkg.devDependencies["vue-tsc"] = "^2.0.0";
+    if (cfg.isVue && cfg.isTs) pkg.devDependencies["vue-tsc"] = "^3.0.0";
     if (cfg.hasApp) {
       files[`vite.config.${cfg.ext}`] = [p.import, ``, `import { defineConfig } from 'vite';`, ``, `export default defineConfig({`, `	plugins: [${p.call}],`, `});`, ``].join("\n");
       pkg.private = true;
@@ -806,8 +806,8 @@ var vite_default = {
       ].join("\n");
       pkg.scripts.build = "vite build";
       pkg.scripts.dev = "vite build --watch";
-      pkg.devDependencies["vite-plugin-dts"] = "^4.0.0";
-      if (cfg.isVue) pkg.devDependencies["vue-tsc"] = "^2.0.0";
+      pkg.devDependencies["vite-plugin-dts"] = "^5.0.0";
+      if (cfg.isVue) pkg.devDependencies["vue-tsc"] = "^3.0.0";
       pkg.files = ["dist"];
       pkg.type = "module";
       pkg.main = "./dist/index.cjs";
@@ -841,7 +841,7 @@ var service_default = {
           start: "node dist/index.js",
           dev: cfg.isTs ? "tsx watch src/index.ts" : "node --watch src/index.js"
         },
-        dependencies: { hono: "^4.5.0", "@hono/node-server": "^1.12.0" },
+        dependencies: { hono: "^4.5.0", "@hono/node-server": "^2.0.0" },
         ...cfg.isTs ? { devDependencies: { tsx: "^4.0.0" } } : {}
       }
     };
@@ -927,9 +927,9 @@ import { svelteTesting } from '@testing-library/svelte/vite';`,
       ].filter((l) => l !== null).join("\n");
       pkg.scripts.test = "vitest run";
       pkg.scripts["test:watch"] = "vitest";
-      pkg.devDependencies.vitest = "^2.0.0";
+      pkg.devDependencies.vitest = "^4.0.0";
       if (cfg.hasFramework) {
-        pkg.devDependencies.jsdom = "^25.0.0";
+        pkg.devDependencies.jsdom = "^29.0.0";
         pkg.devDependencies["@testing-library/dom"] = "^10.0.0";
         if (cfg.isReact) pkg.devDependencies["@testing-library/react"] = "^16.0.0";
         if (cfg.isVue) pkg.devDependencies["@testing-library/vue"] = "^8.1.0";
@@ -937,17 +937,17 @@ import { svelteTesting } from '@testing-library/svelte/vite';`,
       }
       if (cfg.coverage) {
         pkg.scripts.coverage = "vitest run --coverage";
-        pkg.devDependencies["@vitest/coverage-v8"] = "^2.0.0";
+        pkg.devDependencies["@vitest/coverage-v8"] = "^4.0.0";
       }
       files[`src/index.test.${testExt}`] = exampleTest("vitest", cfg);
     } else if (cfg.test === "jest") {
       files["jest.config.js"] = jestConfig(cfg);
       pkg.scripts.test = "jest";
       pkg.scripts["test:watch"] = "jest --watch";
-      pkg.devDependencies.jest = "^29.0.0";
+      pkg.devDependencies.jest = "^30.0.0";
       if (cfg.isTs) {
         pkg.devDependencies["ts-jest"] = "^29.0.0";
-        pkg.devDependencies["@types/jest"] = "^29.0.0";
+        pkg.devDependencies["@types/jest"] = "^30.0.0";
       }
       if (cfg.coverage) pkg.scripts.coverage = "jest --coverage";
       files[`src/index.test.${testExt}`] = exampleTest("jest", cfg);
@@ -1084,15 +1084,15 @@ var lint_default = {
       files["eslint.config.js"] = eslintFlatConfig(cfg);
       pkg.scripts.lint = "eslint .";
       pkg.scripts["lint:fix"] = "eslint . --fix";
-      pkg.devDependencies.eslint = "^9.0.0";
-      pkg.devDependencies["@eslint/js"] = "^9.0.0";
+      pkg.devDependencies.eslint = "^10.0.0";
+      pkg.devDependencies["@eslint/js"] = "^10.0.0";
       if (cfg.isTs) pkg.devDependencies["typescript-eslint"] = "^8.0.0";
     } else if (cfg.lint === "oxlint") {
       pkg.scripts.lint = "oxlint";
-      pkg.devDependencies.oxlint = "^0.9.0";
+      pkg.devDependencies.oxlint = "^1.0.0";
     } else if (cfg.lint === "biome") {
       files["biome.json"] = toJson({
-        $schema: "https://biomejs.dev/schemas/1.8.0/schema.json",
+        $schema: "https://biomejs.dev/schemas/2.0.0/schema.json",
         formatter: { enabled: true, indentStyle: "tab", lineWidth: 100 },
         linter: { enabled: true, rules: { recommended: true } },
         javascript: { formatter: { quoteStyle: "single", trailingCommas: "all" } }
@@ -1100,7 +1100,7 @@ var lint_default = {
       pkg.scripts.lint = "biome check .";
       pkg.scripts["lint:fix"] = "biome check --write .";
       pkg.scripts.format = "biome format --write .";
-      pkg.devDependencies["@biomejs/biome"] = "^1.8.0";
+      pkg.devDependencies["@biomejs/biome"] = "^2.0.0";
     }
     return { files, pkg };
   }
@@ -1152,11 +1152,11 @@ var githooks_default = {
     } else if (cfg.gitHooks === "lefthook") {
       files["lefthook.yml"] = lefthookYml(cfg, staged);
       pkg.scripts.prepare = "lefthook install";
-      pkg.devDependencies.lefthook = "^1.7.0";
+      pkg.devDependencies.lefthook = "^2.0.0";
     }
     if (needsLintStaged) {
       pkg["lint-staged"] = staged;
-      pkg.devDependencies["lint-staged"] = "^15.2.0";
+      pkg.devDependencies["lint-staged"] = "^17.0.0";
     }
     return { files, pkg };
   }
@@ -1201,10 +1201,10 @@ var release_default = {
         npm: { publish: true }
       });
       pkg.scripts.release = "release-it";
-      pkg.devDependencies["release-it"] = "^17.0.0";
+      pkg.devDependencies["release-it"] = "^20.0.0";
     } else if (cfg.release === "np") {
       pkg.scripts.release = "np";
-      pkg.devDependencies.np = "^10.0.0";
+      pkg.devDependencies.np = "^11.0.0";
     }
     return { files, pkg };
   }
@@ -1524,7 +1524,7 @@ var storybook_default = {
       ``,
       `const config: StorybookConfig = {`,
       `	stories: ['../src/**/*.stories.@(ts|tsx|svelte)'],`,
-      `	addons: ['@storybook/addon-essentials'],`,
+      `	addons: [],`,
       `	framework: '${fw.builder}',`,
       `};`,
       `export default config;`,
@@ -1541,11 +1541,10 @@ var storybook_default = {
           "build-storybook": "storybook build"
         },
         devDependencies: {
-          storybook: "^8.2.0",
-          [fw.builder]: "^8.2.0",
-          [fw.renderer]: "^8.2.0",
-          "@storybook/addon-essentials": "^8.2.0",
-          vite: "^5.4.0"
+          storybook: "^10.0.0",
+          [fw.builder]: "^10.0.0",
+          [fw.renderer]: "^10.0.0",
+          vite: "^8.0.0"
         }
       }
     };
@@ -1938,11 +1937,11 @@ function buildMonorepo(cfg) {
     },
     devDependencies: {
       turbo: "^2.0.0",
-      typescript: "^5.5.0",
+      typescript: "^5.9.3",
       tsup: "^8.0.0",
-      vitest: "^2.0.0",
-      eslint: "^9.0.0",
-      "@eslint/js": "^9.0.0",
+      vitest: "^4.0.0",
+      eslint: "^10.0.0",
+      "@eslint/js": "^10.0.0",
       "typescript-eslint": "^8.0.0",
       prettier: "^3.3.0",
       "@changesets/cli": "^2.27.0",

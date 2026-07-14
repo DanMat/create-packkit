@@ -35,9 +35,9 @@ export default {
       ].filter((l) => l !== null).join('\n');
       pkg.scripts.test = 'vitest run';
       pkg.scripts['test:watch'] = 'vitest';
-      pkg.devDependencies.vitest = '^2.0.0';
+      pkg.devDependencies.vitest = '^4.0.0';
       if (cfg.hasFramework) {
-        pkg.devDependencies.jsdom = '^25.0.0';
+        pkg.devDependencies.jsdom = '^29.0.0';
         pkg.devDependencies['@testing-library/dom'] = '^10.0.0';
         if (cfg.isReact) pkg.devDependencies['@testing-library/react'] = '^16.0.0';
         if (cfg.isVue) pkg.devDependencies['@testing-library/vue'] = '^8.1.0';
@@ -45,17 +45,17 @@ export default {
       }
       if (cfg.coverage) {
         pkg.scripts.coverage = 'vitest run --coverage';
-        pkg.devDependencies['@vitest/coverage-v8'] = '^2.0.0';
+        pkg.devDependencies['@vitest/coverage-v8'] = '^4.0.0';
       }
       files[`src/index.test.${testExt}`] = exampleTest('vitest', cfg);
     } else if (cfg.test === 'jest') {
       files['jest.config.js'] = jestConfig(cfg);
       pkg.scripts.test = 'jest';
       pkg.scripts['test:watch'] = 'jest --watch';
-      pkg.devDependencies.jest = '^29.0.0';
+      pkg.devDependencies.jest = '^30.0.0';
       if (cfg.isTs) {
         pkg.devDependencies['ts-jest'] = '^29.0.0';
-        pkg.devDependencies['@types/jest'] = '^29.0.0';
+        pkg.devDependencies['@types/jest'] = '^30.0.0';
       }
       if (cfg.coverage) pkg.scripts.coverage = 'jest --coverage';
       files[`src/index.test.${testExt}`] = exampleTest('jest', cfg);

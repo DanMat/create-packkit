@@ -101,7 +101,7 @@ function svelte(cfg, files, pkg, forApp) {
   const script = cfg.isTs ? `<script lang="ts">` : `<script>`;
   // Shared by the Vite app build and the Vitest (test) config; enables TS in SFCs.
   files['svelte.config.js'] = `import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';\n\nexport default { preprocess: vitePreprocess() };\n`;
-  pkg.devDependencies['@sveltejs/vite-plugin-svelte'] = '^4.0.0';
+  pkg.devDependencies['@sveltejs/vite-plugin-svelte'] = '^7.0.0';
   if (cfg.isTs) pkg.devDependencies['svelte-check'] = '^4.0.0';
   if (forApp) {
     files['index.html'] = htmlShell(cfg, `/src/main.${cfg.ext}`);
