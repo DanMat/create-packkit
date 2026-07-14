@@ -51,11 +51,11 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 ## Ideas from real-world research (2026)
 _From mining pain points across create-typescript-app, tsup, Changesets, create-t3-app, and current "publish an npm package" guides. Ordered by demand × fit._
 
-- [ ] **Type-safe env validation** — `src/env.ts` (Zod / `@t3-oss/env`) + `.env.example`; fail fast on bad config. Highest-demand gap for CLI/service/app targets.
-- [ ] **Snapshot / canary releases** — Action to publish `x.y.z-canary.<hash>` to a dist-tag per PR/push. The loudest recurring Changesets request.
+- [x] ~~**Type-safe env validation** — `src/env.ts` (Zod) + `.env.example`; fail fast on bad config.~~ **Shipped (2.2).** `--env` for services/CLIs.
+- [x] ~~**Snapshot / canary releases** — publish `x.y.z-canary.<hash>` to a dist-tag.~~ **Shipped (2.2).** `--canary` (Changesets); manual-dispatch workflow.
+- [x] ~~**Production Dockerfile for services** — multi-stage, slim, non-root, `.dockerignore`, healthcheck.~~ **Shipped (2.2).** Hardened the Hono service Dockerfile (prod-only deps stage, `USER node`, HEALTHCHECK).
+- [x] ~~**Sourcemaps + declaration maps** — ship source + maps so consumers debug into original code.~~ **Shipped (2.2).** On by default for publishable libs (`--no-sourcemaps` to opt out).
 - [ ] **Docs site generator** — Starlight / VitePress / Nextra + Pages deploy (reuses existing Pages plumbing).
-- [ ] **Production Dockerfile for services** — multi-stage, distroless/slim, non-root, `.dockerignore`, healthcheck (Hono + future Fastify/Express).
-- [ ] **Sourcemaps + declaration maps** — emit `.js.map`/`.d.ts.map` and ship source; fixes a widely-hit tsup footgun. Near-zero effort.
 - [ ] **API docs (TypeDoc)** · **CSS/asset handling for component libs** (`sideEffects`) · **runnable examples + StackBlitz/CodeSandbox buttons** · **all-contributors** · **CLI ergonomics kit** (commander/citty + testable handlers) · **repo settings-as-code** (`.github/settings.yml`) · **benchmarks** (tinybench/mitata) · **cspell + markdownlint** · **OpenSSF Scorecard + SLSA** · **target-aware `moduleResolution` defaults**.
 
 ## Agent / automation reach

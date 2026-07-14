@@ -12,6 +12,10 @@ function pmInstall(cfg) {
 function pmRun(cfg, script) {
   return cfg.packageManager === 'npm' ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
 }
+// Run a package binary (not an npm script) with the right runner per pm.
+function pmExec(cfg, cmd) {
+  return { npm: `npx ${cmd}`, pnpm: `pnpm exec ${cmd}`, yarn: `yarn ${cmd}`, bun: `bunx ${cmd}` }[cfg.packageManager];
+}
 function setupSteps(cfg) {
   const steps = ['      - uses: actions/checkout@v4'];
   if (cfg.packageManager === 'pnpm') steps.push('      - uses: pnpm/action-setup@v4');
@@ -42,6 +46,7 @@ export default {
     if (wf.includes('codeql')) files['.github/workflows/codeql.yml'] = codeqlWorkflow();
     if (wf.includes('stale')) files['.github/workflows/stale.yml'] = staleWorkflow();
     if (cfg.e2e && cfg.hasApp && wf.includes('ci')) files['.github/workflows/e2e.yml'] = e2eWorkflow(cfg);
+    if (cfg.canary && cfg.release === 'changesets') files['.github/workflows/canary.yml'] = canaryWorkflow(cfg);
 
     if (cfg.deps === 'renovate') {
       files['.github/renovate.json'] = toJson({
@@ -222,6 +227,30 @@ function e2eWorkflow(cfg) {
     '          retention-days: 7',
     '',
   ].join('\n');
+}
+
+function canaryWorkflow(cfg) {
+  return [
+    'name: Canary',
+    '# Manually publish a snapshot (x.y.z-canary-<hash>) to the `canary` dist-tag',
+    '# so consumers can test unreleased changes: npm i ' + cfg.name + '@canary',
+    'on:',
+    '  workflow_dispatch:',
+    'concurrency: canary-${{ github.ref }}',
+    'permissions:',
+    '  contents: read',
+    'jobs:',
+    '  canary:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    setupSteps(cfg),
+    '      - name: Authenticate with npm',
+    '        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc',
+    `      - run: ${pmExec(cfg, 'changeset version --snapshot canary')}`,
+    cfg.hasBuild ? `      - run: ${pmRun(cfg, 'build')}` : null,
+    `      - run: ${pmExec(cfg, 'changeset publish --no-git-tag --tag canary')}`,
+    '',
+  ].filter((l) => l !== null).join('\n');
 }
 
 function staleWorkflow() {

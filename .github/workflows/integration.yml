@@ -48,6 +48,7 @@ jobs:
           - ts-lib --bundler unbuild
           - cli --hooks lefthook
           - react-app --e2e
+          - node-service --env
     name: ${{ matrix.preset }}
     steps:
       - uses: actions/checkout@v4

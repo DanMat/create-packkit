@@ -41,7 +41,13 @@ export async function runWizard(seed = {}) {
   }
   cfg.lint = bail(await p.select({ message: 'Lint / format', options: asOptions('lint'), initialValue: OPTIONS.lint.default }));
   cfg.gitHooks = bail(await p.select({ message: 'Git hooks', options: asOptions('gitHooks'), initialValue: OPTIONS.gitHooks.default }));
+  if (cfg.target.includes('service') || cfg.target.includes('cli')) {
+    cfg.env = bail(await p.confirm({ message: 'Type-safe env validation (Zod)?', initialValue: false }));
+  }
   cfg.release = bail(await p.select({ message: 'Release / versioning', options: asOptions('release'), initialValue: OPTIONS.release.default }));
+  if (cfg.release === 'changesets') {
+    cfg.canary = bail(await p.confirm({ message: 'Add a canary/snapshot release workflow?', initialValue: false }));
+  }
   cfg.workflows = bail(await p.multiselect({ message: 'GitHub Actions (space to toggle)', options: asOptions('workflows'), initialValues: OPTIONS.workflows.default, required: false }));
   cfg.deps = bail(await p.select({ message: 'Dependency updates', options: asOptions('deps'), initialValue: OPTIONS.deps.default }));
   cfg.license = bail(await p.select({ message: 'License', options: asOptions('license'), initialValue: OPTIONS.license.default }));

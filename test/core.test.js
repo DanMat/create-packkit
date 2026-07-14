@@ -176,6 +176,46 @@ test('e2e: ignored for non-app targets', () => {
   assert.ok(!out.files['playwright.config.ts']);
 });
 
+test('sourcemaps: ts-lib ships src + declaration maps by default', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'x' }));
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.ok(pkg.files.includes('src'));
+  assert.equal(JSON.parse(out.files['tsconfig.json']).compilerOptions.declarationMap, true);
+});
+
+test('sourcemaps: --no-sourcemaps drops src + maps', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'x', sourcemaps: false }));
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.ok(!pkg.files.includes('src'));
+  assert.ok(!JSON.parse(out.files['tsconfig.json']).compilerOptions.declarationMap);
+});
+
+test('env: node-service --env adds validated env + wires the server', () => {
+  const out = generate(fromPreset('node-service', { name: 'svc', env: true }));
+  assert.ok(out.files['src/env.ts']);
+  assert.ok(out.files['.env.example']);
+  assert.ok(JSON.parse(out.files['package.json']).dependencies.zod);
+  assert.match(out.files['src/index.ts'], /import \{ env \} from '\.\/env\.js'/);
+});
+
+test('env: ignored for libraries', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'x', env: true }));
+  assert.ok(!out.files['src/env.ts']);
+});
+
+test('service: hardened Dockerfile (non-root + healthcheck)', () => {
+  const out = generate(fromPreset('node-service', { name: 'svc' }));
+  assert.match(out.files.Dockerfile, /USER node/);
+  assert.match(out.files.Dockerfile, /HEALTHCHECK/);
+});
+
+test('canary: changesets + canary emits the workflow; gated otherwise', () => {
+  const on = generate(fromPreset('oss', { name: 'lib', canary: true }));
+  assert.ok(on.files['.github/workflows/canary.yml']);
+  const off = generate(fromPreset('ts-lib', { name: 'lib', release: 'release-it', canary: true }));
+  assert.ok(!off.files['.github/workflows/canary.yml']);
+});
+
 test('full preset: workflows + community + agents present', () => {
   const out = generate(fromPreset('full', { name: 'z' }));
   assert.ok(out.files['.github/workflows/ci.yml']);

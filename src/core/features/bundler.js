@@ -18,6 +18,9 @@ export default {
       if (cfg.hasEsm) pkg.module = './src/index.js';
     } else {
       pkg.files = ['dist'];
+      // Ship source alongside dist so the JS sourcemaps resolve — consumers can
+      // step into and go-to-definition on your original code.
+      if (cfg.sourcemaps) pkg.files.push('src');
       const esm = './dist/index.js';
       const cjs = './dist/index.cjs';
       const dtsEsm = './dist/index.d.ts';

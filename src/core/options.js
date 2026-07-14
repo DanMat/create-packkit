@@ -97,6 +97,9 @@ export const OPTIONS = {
   coverage: { group: 'quality', type: 'boolean', label: 'Coverage reporting', default: true },
   storybook: { group: 'quality', type: 'boolean', label: 'Storybook (component libraries)', default: false },
   e2e: { group: 'quality', type: 'boolean', label: 'Playwright end-to-end tests (apps)', default: false },
+  sourcemaps: { group: 'build', type: 'boolean', label: 'Sourcemaps + ship source (debug into original code)', default: true },
+  env: { group: 'quality', type: 'boolean', label: 'Type-safe env validation (Zod) — services & CLIs', default: false },
+  canary: { group: 'release', type: 'boolean', label: 'Snapshot / canary release workflow (Changesets)', default: false },
   pkgChecks: { group: 'quality', type: 'boolean', label: 'Package checks (publint + are-the-types-wrong)', default: false },
   knip: { group: 'quality', type: 'boolean', label: 'Knip (unused files / deps / exports)', default: false },
 
@@ -255,6 +258,12 @@ export function normalizeConfig(input = {}) {
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   // Package-correctness checks only make sense for a publishable package.
   if (!cfg.publishable) cfg.pkgChecks = false;
+  // Sourcemaps + shipped source only matter for a published package.
+  if (!cfg.publishable) cfg.sourcemaps = false;
+  // Env validation is for server-side runtimes (services / CLIs), not libs/apps.
+  if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
+  // Canary snapshots ride on the Changesets flow.
+  if (cfg.release !== 'changesets') cfg.canary = false;
   // JSR is TypeScript-first, ESM, and for plain (non-framework) libraries.
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
   return cfg;

@@ -41,11 +41,12 @@ Options:
   --target <library|cli|service|app>   (repeatable)   --storybook
   --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
   --test <vitest|jest|node|none>   --e2e (Playwright, for apps)
+  --env (type-safe env validation, services/CLIs)   --no-sourcemaps
   --lint <eslint-prettier|biome|oxlint|none>
   --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
   --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
   --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>
-  --pkg-checks (publint + are-the-types-wrong)   --knip   --jsr
+  --pkg-checks (publint + are-the-types-wrong)   --knip   --jsr   --canary
   --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
   --schema            Print the full option/preset schema as JSON (for tools/agents)
   -h, --help          Show this help

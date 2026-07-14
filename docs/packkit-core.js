@@ -127,6 +127,9 @@ var OPTIONS = {
   coverage: { group: "quality", type: "boolean", label: "Coverage reporting", default: true },
   storybook: { group: "quality", type: "boolean", label: "Storybook (component libraries)", default: false },
   e2e: { group: "quality", type: "boolean", label: "Playwright end-to-end tests (apps)", default: false },
+  sourcemaps: { group: "build", type: "boolean", label: "Sourcemaps + ship source (debug into original code)", default: true },
+  env: { group: "quality", type: "boolean", label: "Type-safe env validation (Zod) \u2014 services & CLIs", default: false },
+  canary: { group: "release", type: "boolean", label: "Snapshot / canary release workflow (Changesets)", default: false },
   pkgChecks: { group: "quality", type: "boolean", label: "Package checks (publint + are-the-types-wrong)", default: false },
   knip: { group: "quality", type: "boolean", label: "Knip (unused files / deps / exports)", default: false },
   // ---- lint / format ----
@@ -265,6 +268,9 @@ function normalizeConfig(input = {}) {
   if (cfg.monorepo) cfg.hasBuild = true;
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   if (!cfg.publishable) cfg.pkgChecks = false;
+  if (!cfg.publishable) cfg.sourcemaps = false;
+  if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
+  if (cfg.release !== "changesets") cfg.canary = false;
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
   return cfg;
 }
@@ -497,6 +503,7 @@ var bundler_default = {
       if (cfg.hasEsm) pkg.module = "./src/index.js";
     } else {
       pkg.files = ["dist"];
+      if (cfg.sourcemaps) pkg.files.push("src");
       const esm = "./dist/index.js";
       const cjs = "./dist/index.cjs";
       const dtsEsm = "./dist/index.d.ts";
@@ -612,13 +619,17 @@ var typescript_default = {
       skipLibCheck: true,
       forceConsistentCasingInFileNames: true,
       verbatimModuleSyntax: cfg.bundler !== "none" && !cfg.hasFramework,
-      declaration: true
+      declaration: true,
+      // Declaration maps let editors jump from the published .d.ts into the
+      // shipped .ts source (the bundler emits JS sourcemaps to match).
+      ...cfg.sourcemaps ? { declarationMap: true } : {}
     };
     if (noBuild) {
       compilerOptions.moduleResolution = "NodeNext";
       compilerOptions.module = "NodeNext";
       compilerOptions.outDir = "dist";
       compilerOptions.rootDir = "src";
+      if (cfg.sourcemaps) compilerOptions.sourceMap = true;
     } else {
       compilerOptions.noEmit = true;
     }
@@ -850,7 +861,7 @@ var service_default = {
       [`src/app.${ext}`]: appFile(cfg),
       [`src/index.${ext}`]: serverFile(cfg),
       Dockerfile: dockerfile(cfg),
-      ".dockerignore": "node_modules\ndist\n.git\n.env\n"
+      ".dockerignore": ["node_modules", "dist", "coverage", ".git", ".github", ".env", ".env.*", "!.env.example", "*.log", "Dockerfile", ".dockerignore", ""].join("\n")
     };
     return {
       files,
@@ -881,21 +892,24 @@ function appFile(cfg) {
 function serverFile(cfg) {
   return [
     `import { serve } from '@hono/node-server';`,
-    `import { app } from './app${cfg.isTs ? ".js" : ".js"}';`,
+    `import { app } from './app.js';`,
+    cfg.env ? `import { env } from './env.js';` : null,
     ``,
-    `const port = Number(process.env.PORT) || 3000;`,
+    `const port = ${cfg.env ? "env.PORT" : "Number(process.env.PORT) || 3000"};`,
     `serve({ fetch: app.fetch, port }, (info) => {`,
     `	console.log(\`Listening on http://localhost:\${info.port}\`);`,
     `});`,
     ``
-  ].join("\n");
+  ].filter((l) => l !== null).join("\n");
 }
 function dockerfile(cfg) {
   const node = cfg.nodeVersion;
   const pm = cfg.packageManager;
   const install = pm === "npm" ? "npm ci" : `${pm} install --frozen-lockfile`;
+  const prune = pm === "npm" ? "npm ci --omit=dev" : `${pm} install --prod --frozen-lockfile`;
   const build = pm === "npm" ? "npm run build" : `${pm} run build`;
   return [
+    `# --- build stage: install everything and compile ---`,
     `FROM node:${node}-slim AS build`,
     `WORKDIR /app`,
     `COPY package*.json ./`,
@@ -903,14 +917,74 @@ function dockerfile(cfg) {
     `COPY . .`,
     `RUN ${build}`,
     ``,
+    `# --- deps stage: production-only node_modules for a smaller image ---`,
+    `FROM node:${node}-slim AS deps`,
+    `WORKDIR /app`,
+    `COPY package*.json ./`,
+    `RUN ${prune}`,
+    ``,
+    `# --- runtime stage: slim, non-root, healthchecked ---`,
     `FROM node:${node}-slim`,
     `WORKDIR /app`,
     `ENV NODE_ENV=production`,
-    `COPY --from=build /app/node_modules ./node_modules`,
+    `COPY --from=deps /app/node_modules ./node_modules`,
     `COPY --from=build /app/dist ./dist`,
     `COPY package.json ./`,
+    `USER node`,
     `EXPOSE 3000`,
+    `HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"`,
     `CMD ["node", "dist/index.js"]`,
+    ``
+  ].join("\n");
+}
+
+// src/core/features/env.js
+var env_default = {
+  id: "env",
+  active: (cfg) => cfg.env && (cfg.hasService || cfg.hasCli),
+  apply(cfg) {
+    const files = {};
+    files[`src/env.${cfg.ext}`] = cfg.isTs ? envTs() : envJs();
+    files[".env.example"] = ["NODE_ENV=development", "PORT=3000", ""].join("\n");
+    return { files, pkg: { dependencies: { zod: "^4.0.0" } } };
+  }
+};
+function envTs() {
+  return [
+    `import { z } from 'zod';`,
+    ``,
+    `const schema = z.object({`,
+    `	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),`,
+    `	PORT: z.coerce.number().default(3000),`,
+    `});`,
+    ``,
+    `const parsed = schema.safeParse(process.env);`,
+    `if (!parsed.success) {`,
+    `	console.error('\u274C Invalid environment variables:', z.treeifyError(parsed.error));`,
+    `	process.exit(1);`,
+    `}`,
+    ``,
+    `export const env = parsed.data;`,
+    ``
+  ].join("\n");
+}
+function envJs() {
+  return [
+    `import { z } from 'zod';`,
+    ``,
+    `const schema = z.object({`,
+    `	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),`,
+    `	PORT: z.coerce.number().default(3000),`,
+    `});`,
+    ``,
+    `const parsed = schema.safeParse(process.env);`,
+    `if (!parsed.success) {`,
+    `	console.error('\u274C Invalid environment variables:', z.treeifyError(parsed.error));`,
+    `	process.exit(1);`,
+    `}`,
+    ``,
+    `/** @type {z.infer<typeof schema>} */`,
+    `export const env = parsed.data;`,
     ``
   ].join("\n");
 }
@@ -1381,6 +1455,9 @@ function pmInstall(cfg) {
 function pmRun(cfg, script) {
   return cfg.packageManager === "npm" ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
 }
+function pmExec(cfg, cmd) {
+  return { npm: `npx ${cmd}`, pnpm: `pnpm exec ${cmd}`, yarn: `yarn ${cmd}`, bun: `bunx ${cmd}` }[cfg.packageManager];
+}
 function setupSteps(cfg) {
   const steps = ["      - uses: actions/checkout@v4"];
   if (cfg.packageManager === "pnpm") steps.push("      - uses: pnpm/action-setup@v4");
@@ -1409,6 +1486,7 @@ var workflows_default = {
     if (wf.includes("codeql")) files[".github/workflows/codeql.yml"] = codeqlWorkflow();
     if (wf.includes("stale")) files[".github/workflows/stale.yml"] = staleWorkflow();
     if (cfg.e2e && cfg.hasApp && wf.includes("ci")) files[".github/workflows/e2e.yml"] = e2eWorkflow(cfg);
+    if (cfg.canary && cfg.release === "changesets") files[".github/workflows/canary.yml"] = canaryWorkflow(cfg);
     if (cfg.deps === "renovate") {
       files[".github/renovate.json"] = toJson({
         $schema: "https://docs.renovatebot.com/renovate-schema.json",
@@ -1576,6 +1654,29 @@ function e2eWorkflow(cfg) {
     "          retention-days: 7",
     ""
   ].join("\n");
+}
+function canaryWorkflow(cfg) {
+  return [
+    "name: Canary",
+    "# Manually publish a snapshot (x.y.z-canary-<hash>) to the `canary` dist-tag",
+    "# so consumers can test unreleased changes: npm i " + cfg.name + "@canary",
+    "on:",
+    "  workflow_dispatch:",
+    "concurrency: canary-${{ github.ref }}",
+    "permissions:",
+    "  contents: read",
+    "jobs:",
+    "  canary:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    setupSteps(cfg),
+    "      - name: Authenticate with npm",
+    '        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc',
+    `      - run: ${pmExec(cfg, "changeset version --snapshot canary")}`,
+    cfg.hasBuild ? `      - run: ${pmRun(cfg, "build")}` : null,
+    `      - run: ${pmExec(cfg, "changeset publish --no-git-tag --tag canary")}`,
+    ""
+  ].filter((l) => l !== null).join("\n");
 }
 function staleWorkflow() {
   return [
@@ -1990,6 +2091,7 @@ var features_default = [
   frameworks_default,
   vite_default,
   service_default,
+  env_default,
   test_default,
   e2e_default,
   lint_default,

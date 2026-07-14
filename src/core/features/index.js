@@ -7,6 +7,7 @@ import typescript from './typescript.js';
 import frameworks from './frameworks.js';
 import vite from './vite.js';
 import service from './service.js';
+import env from './env.js';
 import test from './test.js';
 import e2e from './e2e.js';
 import lint from './lint.js';
@@ -29,6 +30,7 @@ export default [
   frameworks,
   vite,
   service,
+  env,
   test,
   e2e,
   lint,

@@ -23,6 +23,7 @@ const OVERRIDE_FLAGS = {
 // Boolean options that default ON — a --no-<flag> turns them off.
 const NEGATABLE = {
   'no-coverage': 'coverage',
+  'no-sourcemaps': 'sourcemaps',
   'no-community': 'community',
   'no-agents': 'agents',
   'no-vscode': 'vscode',
@@ -49,6 +50,8 @@ export function parseCliArgs(argv) {
       monorepo: { type: 'boolean' },
       storybook: { type: 'boolean' },
       e2e: { type: 'boolean' },
+      env: { type: 'boolean' },
+      canary: { type: 'boolean' },
       'pkg-checks': { type: 'boolean' },
       knip: { type: 'boolean' },
       jsr: { type: 'boolean' },
@@ -76,6 +79,8 @@ export function parseCliArgs(argv) {
   if (values.monorepo) overrides.monorepo = true;
   if (values.storybook) overrides.storybook = true;
   if (values.e2e) overrides.e2e = true;
+  if (values.env) overrides.env = true;
+  if (values.canary) overrides.canary = true;
   if (values['pkg-checks']) overrides.pkgChecks = true;
   if (values.knip) overrides.knip = true;
   if (values.jsr) overrides.jsr = true;

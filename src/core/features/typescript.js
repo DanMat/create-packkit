@@ -19,6 +19,9 @@ export default {
       forceConsistentCasingInFileNames: true,
       verbatimModuleSyntax: cfg.bundler !== 'none' && !cfg.hasFramework,
       declaration: true,
+      // Declaration maps let editors jump from the published .d.ts into the
+      // shipped .ts source (the bundler emits JS sourcemaps to match).
+      ...(cfg.sourcemaps ? { declarationMap: true } : {}),
     };
     if (noBuild) {
       // tsc is the build: emit to dist.
@@ -26,6 +29,7 @@ export default {
       compilerOptions.module = 'NodeNext';
       compilerOptions.outDir = 'dist';
       compilerOptions.rootDir = 'src';
+      if (cfg.sourcemaps) compilerOptions.sourceMap = true;
     } else {
       compilerOptions.noEmit = true;
     }

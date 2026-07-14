@@ -10,7 +10,7 @@ export default {
       [`src/app.${ext}`]: appFile(cfg),
       [`src/index.${ext}`]: serverFile(cfg),
       Dockerfile: dockerfile(cfg),
-      '.dockerignore': 'node_modules\ndist\n.git\n.env\n',
+      '.dockerignore': ['node_modules', 'dist', 'coverage', '.git', '.github', '.env', '.env.*', '!.env.example', '*.log', 'Dockerfile', '.dockerignore', ''].join('\n'),
     };
     return {
       files,
@@ -43,22 +43,25 @@ function appFile(cfg) {
 function serverFile(cfg) {
   return [
     `import { serve } from '@hono/node-server';`,
-    `import { app } from './app${cfg.isTs ? '.js' : '.js'}';`,
+    `import { app } from './app.js';`,
+    cfg.env ? `import { env } from './env.js';` : null,
     ``,
-    `const port = Number(process.env.PORT) || 3000;`,
+    `const port = ${cfg.env ? 'env.PORT' : 'Number(process.env.PORT) || 3000'};`,
     `serve({ fetch: app.fetch, port }, (info) => {`,
     `\tconsole.log(\`Listening on http://localhost:\${info.port}\`);`,
     `});`,
     ``,
-  ].join('\n');
+  ].filter((l) => l !== null).join('\n');
 }
 
 function dockerfile(cfg) {
   const node = cfg.nodeVersion;
   const pm = cfg.packageManager;
   const install = pm === 'npm' ? 'npm ci' : `${pm} install --frozen-lockfile`;
+  const prune = pm === 'npm' ? 'npm ci --omit=dev' : `${pm} install --prod --frozen-lockfile`;
   const build = pm === 'npm' ? 'npm run build' : `${pm} run build`;
   return [
+    `# --- build stage: install everything and compile ---`,
     `FROM node:${node}-slim AS build`,
     `WORKDIR /app`,
     `COPY package*.json ./`,
@@ -66,13 +69,22 @@ function dockerfile(cfg) {
     `COPY . .`,
     `RUN ${build}`,
     ``,
+    `# --- deps stage: production-only node_modules for a smaller image ---`,
+    `FROM node:${node}-slim AS deps`,
+    `WORKDIR /app`,
+    `COPY package*.json ./`,
+    `RUN ${prune}`,
+    ``,
+    `# --- runtime stage: slim, non-root, healthchecked ---`,
     `FROM node:${node}-slim`,
     `WORKDIR /app`,
     `ENV NODE_ENV=production`,
-    `COPY --from=build /app/node_modules ./node_modules`,
+    `COPY --from=deps /app/node_modules ./node_modules`,
     `COPY --from=build /app/dist ./dist`,
     `COPY package.json ./`,
+    `USER node`,
     `EXPOSE 3000`,
+    `HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"`,
     `CMD ["node", "dist/index.js"]`,
     ``,
   ].join('\n');
