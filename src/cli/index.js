@@ -30,7 +30,9 @@ Options:
   --from <file>       Load defaults from a JSON profile (or packkit.config.json)
   --name <name>       Package name
   --here              Scaffold into the current directory
-  -y, --yes           Accept defaults / preset, no prompts
+  -y, --yes           Accept defaults / preset, no prompts (one-shot)
+  --recommended       Alias for --yes — recommended defaults in one command
+  --monorepo          Generate a pnpm/Turborepo workspace
   --no-install        Skip dependency install
   --no-git            Skip git init
   --pm <manager>      npm | pnpm | yarn | bun
@@ -64,7 +66,9 @@ export async function run(argv = process.argv.slice(2)) {
     return void console.log(JSON.stringify({ version: pkgVersion(), options: OPTIONS, presets: PRESET_INFO, aliases: PRESET_ALIASES }, null, 2));
   }
 
-  const interactive = !args.preset && !args.yes && !args.from && process.stdout.isTTY;
+  // Only prompt when the user gave nothing to go on — a preset, --yes, a
+  // profile, or any config flag makes it a one-shot.
+  const interactive = !args.preset && !args.yes && !args.from && !args.hasConfigFlags && process.stdout.isTTY;
 
   // Precedence: preset < profile file < CLI flags.
   const profile = loadProfile(args);

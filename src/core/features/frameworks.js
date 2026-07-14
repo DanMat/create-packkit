@@ -40,7 +40,7 @@ function react(cfg, files, pkg, forApp) {
       `}`,
       ``,
     ].join('\n');
-    pkg.dependencies = { react: '^18.3.0', 'react-dom': '^18.3.0' };
+    pkg.dependencies = { react: '^19.0.0', 'react-dom': '^19.0.0' };
   } else {
     files[`src/index.${x}`] = cfg.isTs
       ? [
@@ -56,12 +56,12 @@ function react(cfg, files, pkg, forApp) {
         ].join('\n')
       : [`export function Button({ label, onClick }) {`, `\treturn <button onClick={onClick}>{label}</button>;`, `}`, ``].join('\n');
     pkg.peerDependencies = { react: '>=18', 'react-dom': '>=18' };
-    pkg.devDependencies.react = '^18.3.0';
-    pkg.devDependencies['react-dom'] = '^18.3.0';
+    pkg.devDependencies.react = '^19.0.0';
+    pkg.devDependencies['react-dom'] = '^19.0.0';
   }
   if (cfg.isTs) {
-    pkg.devDependencies['@types/react'] = '^18.3.0';
-    pkg.devDependencies['@types/react-dom'] = '^18.3.0';
+    pkg.devDependencies['@types/react'] = '^19.0.0';
+    pkg.devDependencies['@types/react-dom'] = '^19.0.0';
   }
 }
 

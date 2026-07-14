@@ -1,0 +1,51 @@
+name: Preset or tool request
+description: Suggest a new preset, target, framework, or tool option for Packkit
+title: 'request: <preset or tool name>'
+labels: [enhancement, request]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of request is this?
+      options:
+        - Preset (a named bundle of options)
+        - Tool / option (e.g. a bundler, test runner, linter, workflow)
+        - Target (e.g. library, CLI, service, app)
+        - Framework (e.g. React, Vue, Svelte, Solid)
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: The preset or tool you'd like added
+      placeholder: e.g. solid-lib, biome as a hook runner, Fastify service
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What should it generate?
+      description: The files, config, scripts, and dependencies it should produce.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it useful?
+      description: The use case, and roughly how common it is.
+    validations:
+      required: true
+  - type: input
+    id: refs
+    attributes:
+      label: References
+      description: Links to the tool's docs, a canonical example repo, or a spec.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the [roadmap](https://github.com/DanMat/create-packkit/blob/main/ROADMAP.md) and existing issues.
+          required: true
+        - label: This works as a non-interactive flag/option (not a prompt-only feature).

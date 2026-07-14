@@ -24,6 +24,7 @@
   "scripts": {
     "start": "node bin/cli.js",
     "test": "node --test",
+    "check:deps": "node scripts/check-template-deps.mjs",
     "build:web": "esbuild src/core/index.js --bundle --format=esm --outfile=docs/packkit-core.js"
   },
   "repository": {

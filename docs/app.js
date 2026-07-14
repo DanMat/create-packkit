@@ -73,7 +73,16 @@ function renderPresets() {
     const b = el('button', { textContent: name, title: info });
     b.onmouseenter = () => { if (info) desc.textContent = info; };
     b.onfocus = b.onmouseenter;
-    b.onclick = () => { Object.assign(state, PRESETS[name]); if (info) desc.textContent = info; update(); renderForm(); };
+    b.onclick = () => {
+      // Reset to defaults, then apply the preset — but keep the typed metadata.
+      const keep = { name: state.name, description: state.description, author: state.author };
+      const fresh = { ...defaultConfig(), ...PRESETS[name], ...keep };
+      Object.keys(state).forEach((k) => delete state[k]);
+      Object.assign(state, fresh);
+      if (info) desc.textContent = info;
+      update();
+      renderForm();
+    };
     bar.append(b);
   }
   bar.onmouseleave = () => { desc.textContent = PRESET_HINT; };
@@ -106,9 +115,12 @@ function commandFor(cfg) {
   if (cfg.knip) parts.push('--knip');
   if (cfg.jsr) parts.push('--jsr');
   if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
+  if (cfg.monorepo) parts.push('--monorepo');
   for (const b of ['community', 'agents', 'vscode', 'editorconfig']) {
     if (cfg[b] === false && d[b] === true) parts.push(`--no-${b}`);
   }
+  // No config flags → append -y so the recommended default runs without prompts.
+  if (parts.length === 2) parts.push('-y');
   return parts.join(' ');
 }
 

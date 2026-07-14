@@ -38,6 +38,7 @@ export function parseCliArgs(argv) {
       from: { type: 'string' },
       name: { type: 'string' },
       yes: { type: 'boolean', short: 'y' },
+      recommended: { type: 'boolean' },
       here: { type: 'boolean' },
       'no-install': { type: 'boolean' },
       'no-git': { type: 'boolean' },
@@ -45,6 +46,7 @@ export function parseCliArgs(argv) {
       target: { type: 'string', multiple: true },
       workflows: { type: 'string', multiple: true },
       minify: { type: 'boolean' },
+      monorepo: { type: 'boolean' },
       storybook: { type: 'boolean' },
       'pkg-checks': { type: 'boolean' },
       knip: { type: 'boolean' },
@@ -70,6 +72,7 @@ export function parseCliArgs(argv) {
   if (values.target) overrides.target = values.target;
   if (values.workflows) overrides.workflows = values.workflows;
   if (values.minify) overrides.minify = true;
+  if (values.monorepo) overrides.monorepo = true;
   if (values.storybook) overrides.storybook = true;
   if (values['pkg-checks']) overrides.pkgChecks = true;
   if (values.knip) overrides.knip = true;
@@ -79,12 +82,17 @@ export function parseCliArgs(argv) {
   }
   if (name) overrides.name = name;
 
+  // Config flags provided (anything beyond the name) → the user knows what they
+  // want, so we can skip the wizard.
+  const hasConfigFlags = Object.keys(overrides).some((k) => k !== 'name');
+
   return {
     preset,
     from: values.from,
     name,
     here: !!values.here,
-    yes: !!values.yes,
+    yes: !!values.yes || !!values.recommended,
+    hasConfigFlags,
     install: !values['no-install'],
     git: !values['no-git'],
     help: !!values.help,
