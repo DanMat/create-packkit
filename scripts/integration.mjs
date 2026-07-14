@@ -34,6 +34,10 @@ if (!step('node', [join(repo, 'bin/cli.js'), ...argv, 'app', '--no-git', '--no-i
   process.exit(1);
 }
 
+// Real usage runs `git init` before install; some hook `prepare` scripts
+// (e.g. lefthook install) require a .git directory.
+spawnSync('git', ['init', '--quiet'], { cwd: app });
+
 const pkg = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
 const scripts = pkg.scripts || {};
 const pm =

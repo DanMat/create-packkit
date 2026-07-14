@@ -55,7 +55,8 @@ export default {
       pkg.scripts.dev = 'unbuild --stub';
       pkg.devDependencies = { unbuild: '^3.0.0' };
     } else if (cfg.bundler === 'rollup') {
-      files[`rollup.config.${cfg.ext === 'ts' ? 'ts' : 'js'}`] = rollupConfig(cfg, formats);
+      // Always a .js config — rollup can't load a .ts config without a loader.
+      files['rollup.config.js'] = rollupConfig(cfg, formats);
       pkg.scripts.build = 'rollup -c';
       pkg.scripts.dev = 'rollup -c -w';
       pkg.devDependencies = {
@@ -102,6 +103,7 @@ function unbuildConfig(cfg) {
     `\tentries: ['src/index'],`,
     `\tdeclaration: ${cfg.isTs},`,
     `\tclean: true,`,
+    `\tfailOnWarn: false,`,
     `\trollup: { emitCJS: ${cfg.hasCjs}${cfg.minify ? ', esbuild: { minify: true }' : ''} },`,
     `});`,
     ``,
@@ -116,7 +118,8 @@ function rollupConfig(cfg, formats) {
     cfg.isTs ? `import typescript from '@rollup/plugin-typescript';` : null,
     cfg.minify ? `import terser from '@rollup/plugin-terser';` : null,
   ].filter(Boolean);
-  const plugins = [cfg.isTs ? 'typescript()' : null, cfg.minify ? 'terser()' : null].filter(Boolean);
+  // plugin-typescript needs a declarationDir when the tsconfig enables declarations.
+  const plugins = [cfg.isTs ? `typescript({ declarationDir: 'dist', rootDir: 'src', exclude: ['**/*.test.ts'] })` : null, cfg.minify ? 'terser()' : null].filter(Boolean);
   const pluginLine = plugins.length ? `\n\tplugins: [${plugins.join(', ')}],` : '';
   return [
     (imports.length ? imports.join('\n') + '\n' : '') + `export default {`,

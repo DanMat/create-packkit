@@ -156,6 +156,9 @@ function jestConfig(cfg) {
       `\tpreset: 'ts-jest/presets/default-esm',`,
       `\ttestEnvironment: 'node',`,
       `\textensionsToTreatAsEsm: ['.ts'],`,
+      `\ttransform: {`,
+      `\t\t'^.+\\\\.ts$': ['ts-jest', { useESM: true, tsconfig: { verbatimModuleSyntax: false } }],`,
+      `\t},`,
       `};`,
       ``,
     ].join('\n');

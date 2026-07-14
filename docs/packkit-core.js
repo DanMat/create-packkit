@@ -507,7 +507,7 @@ var bundler_default = {
       pkg.scripts.dev = "unbuild --stub";
       pkg.devDependencies = { unbuild: "^3.0.0" };
     } else if (cfg.bundler === "rollup") {
-      files[`rollup.config.${cfg.ext === "ts" ? "ts" : "js"}`] = rollupConfig(cfg, formats);
+      files["rollup.config.js"] = rollupConfig(cfg, formats);
       pkg.scripts.build = "rollup -c";
       pkg.scripts.dev = "rollup -c -w";
       pkg.devDependencies = {
@@ -549,6 +549,7 @@ function unbuildConfig(cfg) {
     `	entries: ['src/index'],`,
     `	declaration: ${cfg.isTs},`,
     `	clean: true,`,
+    `	failOnWarn: false,`,
     `	rollup: { emitCJS: ${cfg.hasCjs}${cfg.minify ? ", esbuild: { minify: true }" : ""} },`,
     `});`,
     ``
@@ -560,7 +561,7 @@ function rollupConfig(cfg, formats) {
     cfg.isTs ? `import typescript from '@rollup/plugin-typescript';` : null,
     cfg.minify ? `import terser from '@rollup/plugin-terser';` : null
   ].filter(Boolean);
-  const plugins = [cfg.isTs ? "typescript()" : null, cfg.minify ? "terser()" : null].filter(Boolean);
+  const plugins = [cfg.isTs ? `typescript({ declarationDir: 'dist', rootDir: 'src', exclude: ['**/*.test.ts'] })` : null, cfg.minify ? "terser()" : null].filter(Boolean);
   const pluginLine = plugins.length ? `
 	plugins: [${plugins.join(", ")}],` : "";
   return [
@@ -1047,6 +1048,9 @@ function jestConfig(cfg) {
       `	preset: 'ts-jest/presets/default-esm',`,
       `	testEnvironment: 'node',`,
       `	extensionsToTreatAsEsm: ['.ts'],`,
+      `	transform: {`,
+      `		'^.+\\\\.ts$': ['ts-jest', { useESM: true, tsconfig: { verbatimModuleSyntax: false } }],`,
+      `	},`,
       `};`,
       ``
     ].join("\n");
