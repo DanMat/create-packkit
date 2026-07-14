@@ -1,10 +1,6 @@
 // Always-on: base package.json descriptive fields + the source entry + README.
 
-// The real minimum patch for each major, driven by our template deps (eslint 10,
-// jsdom 29, vite 8 need ^20.19; vite/others need ^22.12). `>=20` would be a lie —
-// a user on 20.17 hits EBADENGINE and transitive syntax errors. Keep this honest.
-export const NODE_FLOOR = { 18: '18.18.0', 20: '20.19.0', 22: '22.12.0', 24: '24.0.0' };
-const nodeFloor = (v) => NODE_FLOOR[v] || `${v}.0.0`;
+import { nodeFloor } from '../node.js';
 
 export default {
   id: 'meta',
@@ -118,6 +114,13 @@ function readme(cfg) {
 
   const badges = makeBadges(cfg);
   if (badges) lines.push(badges, '');
+
+  lines.push(
+    '## Requirements',
+    '',
+    `Node.js >= ${nodeFloor(cfg.nodeVersion)} (\`.nvmrc\` pins it; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
+    '',
+  );
 
   lines.push('## Install', '', '```sh', install, '```', '');
 

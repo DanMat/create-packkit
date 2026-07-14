@@ -39,11 +39,17 @@ indent_style = space
 indent_size = 2
 `;
 
+// engine-strict turns npm/pnpm's `engines` warning into a hard install error, so
+// a contributor, CI job, or agent on an unsupported Node fails immediately with a
+// clear message instead of a broken install they scroll past.
+const NPMRC = `engine-strict=true
+`;
+
 export default {
   id: 'gitfiles',
   active: () => true,
   apply(cfg) {
-    const files = { '.gitignore': GITIGNORE };
+    const files = { '.gitignore': GITIGNORE, '.npmrc': NPMRC };
     if (cfg.editorconfig) files['.editorconfig'] = EDITORCONFIG;
     return { files, pkg: {} };
   },

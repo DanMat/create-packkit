@@ -325,9 +325,11 @@ function sortKeys(obj) {
   return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
 }
 
-// src/core/features/meta.js
+// src/core/node.js
 var NODE_FLOOR = { 18: "18.18.0", 20: "20.19.0", 22: "22.12.0", 24: "24.0.0" };
 var nodeFloor = (v) => NODE_FLOOR[v] || `${v}.0.0`;
+
+// src/core/features/meta.js
 var meta_default = {
   id: "meta",
   active: () => true,
@@ -419,6 +421,12 @@ function readme(cfg) {
   ];
   const badges = makeBadges(cfg);
   if (badges) lines.push(badges, "");
+  lines.push(
+    "## Requirements",
+    "",
+    `Node.js >= ${nodeFloor(cfg.nodeVersion)} (\`.nvmrc\` pins it; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
+    ""
+  );
   lines.push("## Install", "", "```sh", install, "```", "");
   if (cfg.hasApp) {
     lines.push("## Develop", "", "```sh", run(cfg, "dev") + "     # start the dev server", run(cfg, "build") + "   # production build", "```", "");
@@ -1882,11 +1890,13 @@ indent_style = tab
 indent_style = space
 indent_size = 2
 `;
+var NPMRC = `engine-strict=true
+`;
 var gitfiles_default = {
   id: "gitfiles",
   active: () => true,
   apply(cfg) {
-    const files = { ".gitignore": GITIGNORE };
+    const files = { ".gitignore": GITIGNORE, ".npmrc": NPMRC };
     if (cfg.editorconfig) files[".editorconfig"] = EDITORCONFIG;
     return { files, pkg: {} };
   }

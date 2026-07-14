@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
+import { nodeFloor, meetsNodeFloor } from '../core/node.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
 import { writeProject, dirIsEmptyOrMissing, gitInit, installDeps } from './write.js';
@@ -87,6 +88,25 @@ export async function run(argv = process.argv.slice(2)) {
   config.gitInit = args.git;
   config.install = args.install;
 
+  // Node preflight: the generated project's tools (eslint, vite, vitest) hard-
+  // require this floor. npm only *warns* on engines, so catch it here — clearly,
+  // once — instead of letting a doomed install spew EBADENGINE and leave a broken
+  // project. This is the signal both humans and agents need up front.
+  const floor = nodeFloor(config.nodeVersion);
+  const nodeOk = meetsNodeFloor(process.version, floor);
+  if (!nodeOk) {
+    const lines = [
+      `Node ${process.version} is below this project's required Node >= ${floor}.`,
+      `Tools like eslint, vite and vitest will not run on it.`,
+      `Fix: nvm install ${config.nodeVersion}   (or install any Node >= ${floor})`,
+    ];
+    if (config.install) {
+      lines.push(`Skipping the dependency install until Node is upgraded.`);
+      config.install = false;
+    }
+    if (interactive) p.log.warn(lines.join('\n')); else console.error('\n⚠  ' + lines.join('\n   '));
+  }
+
   // Resolve the target directory.
   const targetDir = args.here ? process.cwd() : resolve(process.cwd(), config.name);
   if (!args.here && !config.name) {
@@ -119,13 +139,25 @@ export async function run(argv = process.argv.slice(2)) {
     config.test !== 'none' ? `${runWord(config)} test` : null,
   ].filter(Boolean);
 
+  // Clarify things that surprise people: a framework *library* has no dev
+  // server (its `dev` just rebuilds), and the Node floor this project needs.
+  const componentLib = config.hasFramework && config.hasLibrary && !config.hasApp;
+  const hints = [
+    componentLib
+      ? `This is a ${config.framework} component library — \`${runWord(config)} dev\` rebuilds on change (there's no dev server). For a runnable app, scaffold the "${config.framework}-app" preset instead.`
+      : null,
+    `Requires Node >= ${floor}${nodeOk ? '' : ` — you're on ${process.version}, upgrade first`}.`,
+  ].filter(Boolean);
+
   const done = `Created ${summary.name} — ${summary.fileCount} files · ${summary.stack.join(' · ')}`;
   if (interactive) {
     p.note(next.join('\n') || 'You are all set.', 'Next steps');
+    if (hints.length) p.log.info(hints.join('\n'));
     p.outro(done);
   } else {
     console.log(done);
     if (next.length) console.log('\nNext steps:\n  ' + next.join('\n  '));
+    if (hints.length) console.log('\n' + hints.map((h) => '• ' + h).join('\n'));
   }
 
   const latest = await checkForUpdate(pkgVersion());
