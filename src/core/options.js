@@ -197,6 +197,50 @@ export const GROUPS = [
   { id: 'repo', label: 'Repository' },
 ];
 
+// Plain-English "what it is / why you'd pick it" for every option. One source
+// of truth for the web tooltips, the README reference, and `--schema` (agents).
+export const OPTION_HELP = {
+  name: 'The npm package name. Scoped names like `@you/pkg` are fine.',
+  description: 'One-line summary — used in package.json and the README heading.',
+  author: 'Your name (and optionally email/URL). Populates package.json + LICENSE.',
+  keywords: 'Comma-separated npm keywords to help people discover the package.',
+  repo: 'Git repository URL. Wires up repository/bugs/homepage links and CI badges.',
+  language: 'TypeScript (strict, recommended) or plain ESM JavaScript. TS gives you types, editor help, and generated .d.ts for consumers.',
+  moduleFormat: 'How the package is consumed. ESM-only (default) is the modern, leanest choice — Node 20.19+/22.12+ can `require()` ESM. Pick dual only if you must support older CJS-only consumers; cjs-only is rarely needed.',
+  target: 'What you are building — mix and match: a library (importable package), a CLI (ships a bin), an HTTP service, or an app (Vite SPA).',
+  serviceFramework: 'For the service target: Hono (fast, web-standard, tiny — default), Fastify (batteries-included, plugins, schema validation), or Express (ubiquitous, huge ecosystem).',
+  monorepo: 'Generate a pnpm + Turborepo workspace with two linked example packages and Changesets. Only worth it when ≥2 packages share code.',
+  framework: 'UI framework for component libraries and apps: React, Vue, or Svelte (or none for a plain package).',
+  packageManager: 'Which package manager the scripts, lockfile, and CI target: npm, pnpm, yarn, or bun.',
+  nodeVersion: 'Minimum Node line to support. Choices track Node’s own release schedule (Active LTS is the default); this sets engines + .nvmrc.',
+  bundler: 'How the library is built. tsup (default, esbuild-fast) and tsdown suit most libs; unbuild for zero-config; rollup for full control; none = tsc-only (or no build).',
+  minify: 'Minify the build output. Best for CLIs and browser bundles; usually unnecessary for libraries (consumers minify).',
+  sourcemaps: 'Ship source + JS/declaration maps so consumers can step into and go-to-definition on your original code when debugging. On by default for libraries.',
+  test: 'Test runner: Vitest (fast, Vite-native, default), Jest (classic, huge ecosystem), or Node’s built-in node:test (zero deps).',
+  coverage: 'Collect code-coverage reports (v8) and add a `coverage` script. Pairs with the Codecov workflow.',
+  storybook: 'Add Storybook to develop and document components in isolation. Component libraries only.',
+  e2e: 'Add Playwright end-to-end tests for app targets: a config that boots your dev server, an example spec, and a CI job.',
+  sizeLimit: 'Add a bundle-size budget (size-limit) that measures your built entry and fails CI if it exceeds the limit — catches accidental bloat.',
+  doctor: 'Add an env doctor (`npm run doctor`) that warns when the local Node / package manager don’t match what the project expects. Warn-only.',
+  env: 'Type-safe environment variables: a Zod-validated `src/env.ts` that fails fast on misconfig, plus a `.env.example`. For services and CLIs.',
+  pkgChecks: 'Verify the published package is correct with publint + are-the-types-wrong (exports map, types resolution, ESM/CJS). Highly recommended for libraries.',
+  knip: 'Find unused files, dependencies, and exports so the project doesn’t accumulate dead weight.',
+  lint: 'Linter + formatter: ESLint + Prettier (default, most compatible), Biome (one fast tool for both), or oxlint (Rust-fast linting).',
+  gitHooks: 'Pre-commit hooks that run lint-staged: simple-git-hooks (tiny, default), husky (popular), or lefthook (fast, parallel).',
+  release: 'How you version + publish: Changesets (default, great for libraries and monorepos), release-it, np, or none.',
+  canary: 'Add a workflow that publishes snapshot builds (x.y.z-canary-<hash>) to a `canary` dist-tag so people can test unreleased changes. Requires Changesets.',
+  jsr: 'Also publish to JSR, the TypeScript-first registry. For plain ESM TypeScript libraries.',
+  workflows: 'GitHub Actions to include: ci (lint/test/build), npm-publish (provenance), pages (deploy Storybook/site), codeql (security), codecov (coverage), stale.',
+  deps: 'Automated dependency updates: Renovate (default, powerful) or Dependabot (built into GitHub).',
+  license: 'Open-source license for the LICENSE file and package.json (MIT recommended), or none.',
+  community: 'Community health files: CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, and issue/PR templates.',
+  agents: 'AI-agent instructions (AGENTS.md + CLAUDE.md) so coding agents know how to build, test, and work in the repo.',
+  vscode: 'VS Code workspace settings + recommended-extensions so the repo is set up consistently on open.',
+  editorconfig: 'An .editorconfig so every editor uses the same indentation and line endings.',
+  gitInit: 'Run `git init` and make an initial commit after scaffolding.',
+  install: 'Install dependencies automatically after scaffolding.',
+};
+
 /** Build a default config from the schema. */
 export function defaultConfig() {
   const cfg = {};

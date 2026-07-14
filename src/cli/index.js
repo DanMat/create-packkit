@@ -2,7 +2,7 @@ import { resolve, basename } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
-import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
+import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, OPTION_HELP, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
 import { engineFloor, meetsNodeFloor } from '../core/node.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
@@ -18,48 +18,75 @@ const pkgVersion = () => {
 };
 
 const HELP = `
-packkit — scaffold a modern npm package or CLI
+packkit — scaffold a modern npm package, CLI, service, or app
 
 Usage:
   npm create packkit@latest [name] [options]
   npx packkit [preset] [name] [options]
 
-Presets: ${PRESET_NAMES.join(', ')}
+Run with no options for an interactive wizard, or add -y for recommended
+defaults in one shot. Every option is documented (with why-you'd-use-it) at:
+  https://danmat.github.io/create-packkit/   ·   and in the README reference.
 
-Options:
-  --preset <name>     Use a preset (skips the wizard)
-  --from <file>       Load defaults from a JSON profile (or packkit.config.json)
-  --name <name>       Package name
-  --here              Scaffold into the current directory
-  -y, --yes           Accept defaults / preset, no prompts (one-shot)
-  --recommended       Alias for --yes — recommended defaults in one command
-  --monorepo          Generate a pnpm/Turborepo workspace
-  --no-install        Skip dependency install
-  --no-git            Skip git init
-  --pm <manager>      npm | pnpm | yarn | bun
-  --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react|vue|svelte>
-  --target <library|cli|service|app>   (repeatable)   --storybook
-  --server <hono|fastify|express>   (HTTP service framework)
-  --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
-  --test <vitest|jest|node|none>   --e2e (Playwright, for apps)
-  --env (type-safe env validation, services/CLIs)   --no-sourcemaps
+Presets:
+  ${PRESET_NAMES.join('  ')}
+  shortcuts: lib jslib rlib rapp vlib vapp slib sapp svc
+
+Getting started:
+  --preset <name>      Start from a preset (skips the wizard)
+  --from <file>        Load defaults from a JSON profile (or packkit.config.json)
+  -y, --yes            Accept defaults / preset, no prompts (one-shot)
+  --recommended        Alias for -y
+  --here               Scaffold into the current directory
+  --no-install         Skip dependency install
+  --no-git             Skip git init
+
+Stack:
+  --language <ts|js>
+  --module <esm|cjs|dual>                 ESM-only is the default
+  --framework <none|react|vue|svelte>
+  --target <library|cli|service|app>      repeatable
+  --server <hono|fastify|express>         HTTP service framework
+  --pm <npm|pnpm|yarn|bun>
+  --monorepo                              pnpm + Turborepo workspace
+
+Build & test:
+  --bundler <tsup|tsdown|unbuild|rollup|none>
+  --minify                                Minify the build output
+  --no-sourcemaps                         Don't ship source / sourcemaps
+  --test <vitest|jest|node|none>
+  --e2e                                   Playwright end-to-end tests (apps)
+  --size-limit                            Bundle-size budget + CI gate (libs)
+
+Quality:
   --lint <eslint-prettier|biome|oxlint|none>
-  --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
-  --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
-  --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>
-  --pkg-checks (publint + are-the-types-wrong)   --knip   --jsr   --canary
-  --size-limit (bundle-size budget, libraries)   --doctor (env check)
-  --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
-  --schema            Print the full option/preset schema as JSON (for tools/agents)
-  -h, --help          Show this help
-  -v, --version       Show version
+  --hooks <simple-git-hooks|husky|lefthook|none>
+  --pkg-checks                            publint + are-the-types-wrong
+  --knip                                  Find unused files / deps / exports
+  --doctor                                Warn on Node / pm mismatch
+  --env                                   Type-safe env validation (services/CLIs)
 
-Preset shortcuts: lib, jslib, rlib, rapp, vlib, vapp, slib, sapp, svc
+Release & CI:
+  --release <changesets|release-it|np|none>
+  --canary                                Snapshot/canary release workflow
+  --jsr                                   Also publish to JSR
+  --workflows <ci|npm-publish|pages|codeql|codecov|stale>   repeatable
+  --deps <renovate|dependabot|none>
+
+Repo & extras:
+  --license <MIT|Apache-2.0|ISC|none>
+  --storybook                             Storybook (component libraries)
+  --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
+
+Other:
+  --schema             Print the full option/preset schema as JSON (for agents)
+  -h, --help           Show this help          -v, --version   Show version
 
 Examples:
-  npx packkit ts-lib my-lib
-  npm create packkit@latest my-cli -- --preset cli
-  npx packkit --preset full my-pkg --pm pnpm
+  npx packkit ts-lib my-lib -y
+  npx packkit react-app my-app --e2e
+  npx packkit node-service api --server fastify --env
+  npm create packkit@latest my-pkg -- --preset oss --pm pnpm
 `;
 
 export async function run(argv = process.argv.slice(2)) {
@@ -68,7 +95,7 @@ export async function run(argv = process.argv.slice(2)) {
   if (args.version) return void console.log(pkgVersion());
   if (args.schema) {
     // Machine-readable interface for tools/agents: every option, preset, and alias.
-    return void console.log(JSON.stringify({ version: pkgVersion(), options: OPTIONS, presets: PRESET_INFO, aliases: PRESET_ALIASES }, null, 2));
+    return void console.log(JSON.stringify({ version: pkgVersion(), options: OPTIONS, optionHelp: OPTION_HELP, presets: PRESET_INFO, aliases: PRESET_ALIASES }, null, 2));
   }
 
   // Only prompt when the user gave nothing to go on — a preset, --yes, a

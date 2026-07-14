@@ -2,14 +2,14 @@
 // generate(config) -> { config, files: { path: contents }, postCommands, summary }
 // The CLI writes `files` to disk; the web configurator zips them.
 
-import { normalizeConfig, OPTIONS, GROUPS, defaultConfig } from './options.js';
+import { normalizeConfig, OPTIONS, GROUPS, OPTION_HELP, defaultConfig } from './options.js';
 import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
 import { buildMonorepo } from './monorepo.js';
 import { PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset } from './presets.js';
 
-export { OPTIONS, GROUPS, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
+export { OPTIONS, GROUPS, OPTION_HELP, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
 
 /** Apply a named preset (or alias) over the defaults, returning a full config. */
 export function fromPreset(name, overrides = {}) {

@@ -1,4 +1,4 @@
-import { generate, OPTIONS, GROUPS, defaultConfig, PRESETS, PRESET_INFO } from './packkit-core.js';
+import { generate, OPTIONS, GROUPS, OPTION_HELP, defaultConfig, PRESETS, PRESET_INFO } from './packkit-core.js';
 
 // Options that only matter to the CLI (disk/git) — hide them from the web form.
 const HIDDEN = new Set(['gitInit', 'install']);
@@ -29,6 +29,7 @@ function renderForm() {
 function renderField(key) {
   const opt = OPTIONS[key];
   const field = el('div', { className: 'field' }, el('label', { textContent: opt.label }));
+  if (OPTION_HELP[key]) field.append(el('p', { className: 'field-hint', textContent: OPTION_HELP[key] }));
 
   if (opt.type === 'text') {
     const input = el('input', { type: 'text', value: state[key] ?? '', placeholder: opt.default || '' });
