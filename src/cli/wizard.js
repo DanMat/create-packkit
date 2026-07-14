@@ -36,6 +36,9 @@ export async function runWizard(seed = {}) {
     cfg.minify = bail(await p.confirm({ message: 'Minify the build output?', initialValue: false }));
   }
   cfg.test = bail(await p.select({ message: 'Test runner', options: asOptions('test'), initialValue: OPTIONS.test.default }));
+  if (cfg.target.includes('service')) {
+    cfg.serviceFramework = bail(await p.select({ message: 'Service framework', options: asOptions('serviceFramework'), initialValue: OPTIONS.serviceFramework.default }));
+  }
   if (cfg.target.includes('app')) {
     cfg.e2e = bail(await p.confirm({ message: 'Add Playwright end-to-end tests?', initialValue: false }));
   }

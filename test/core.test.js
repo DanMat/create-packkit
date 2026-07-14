@@ -209,6 +209,23 @@ test('service: hardened Dockerfile (non-root + healthcheck)', () => {
   assert.match(out.files.Dockerfile, /HEALTHCHECK/);
 });
 
+test('service frameworks: fastify and express generate their own app + deps', () => {
+  const fastify = generate(fromPreset('node-service', { name: 'svc', serviceFramework: 'fastify' }));
+  assert.match(fastify.files['src/app.ts'], /import Fastify from 'fastify'/);
+  assert.ok(JSON.parse(fastify.files['package.json']).dependencies.fastify);
+  assert.match(fastify.files['src/index.ts'], /app\.listen\(\{ port/);
+
+  const express = generate(fromPreset('node-service', { name: 'svc', serviceFramework: 'express' }));
+  assert.match(express.files['src/app.ts'], /import express from 'express'/);
+  const pkg = JSON.parse(express.files['package.json']);
+  assert.ok(pkg.dependencies.express);
+  assert.ok(pkg.devDependencies.supertest); // express test needs supertest
+  assert.match(express.files['src/index.test.ts'], /supertest/);
+
+  const hono = generate(fromPreset('node-service', { name: 'svc' }));
+  assert.match(hono.files['src/app.ts'], /from 'hono'/);
+});
+
 test('size-limit: library gets config + script; ignored for apps', () => {
   const lib = generate(fromPreset('ts-lib', { name: 'x', sizeLimit: true }));
   assert.ok(lib.files['.size-limit.json']);

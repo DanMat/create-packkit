@@ -105,7 +105,8 @@ if (scripts['test:e2e']) {
 }
 
 // 4) services: prove the built server actually starts and responds
-if (scripts.start && pkg.dependencies && pkg.dependencies.hono) {
+const deps = pkg.dependencies || {};
+if (scripts.start && (deps.hono || deps.fastify || deps.express)) {
   console.log('\n$ node dist/index.js  (checking /health)');
   const child = spawn('node', ['dist/index.js'], { cwd: app, stdio: 'inherit' });
   let ok = false;

@@ -34,6 +34,14 @@ export const OPTIONS = {
       { value: 'cjs', label: 'CommonJS only' },
     ],
   },
+  serviceFramework: {
+    group: 'core', type: 'select', label: 'Service framework (HTTP service)', default: 'hono',
+    choices: [
+      { value: 'hono', label: 'Hono (fast, web-standard)' },
+      { value: 'fastify', label: 'Fastify' },
+      { value: 'express', label: 'Express' },
+    ],
+  },
   target: {
     group: 'core', type: 'multiselect', label: 'What are you building?', default: ['library'],
     choices: [

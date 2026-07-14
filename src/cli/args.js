@@ -15,6 +15,7 @@ const OVERRIDE_FLAGS = {
   license: 'license',
   pm: 'packageManager',
   node: 'nodeVersion',
+  server: 'serviceFramework',
   author: 'author',
   description: 'description',
   repo: 'repo',

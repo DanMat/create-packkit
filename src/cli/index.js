@@ -39,6 +39,7 @@ Options:
   --pm <manager>      npm | pnpm | yarn | bun
   --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react|vue|svelte>
   --target <library|cli|service|app>   (repeatable)   --storybook
+  --server <hono|fastify|express>   (HTTP service framework)
   --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
   --test <vitest|jest|node|none>   --e2e (Playwright, for apps)
   --env (type-safe env validation, services/CLIs)   --no-sourcemaps

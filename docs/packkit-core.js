@@ -42,6 +42,17 @@ var OPTIONS = {
       { value: "cjs", label: "CommonJS only" }
     ]
   },
+  serviceFramework: {
+    group: "core",
+    type: "select",
+    label: "Service framework (HTTP service)",
+    default: "hono",
+    choices: [
+      { value: "hono", label: "Hono (fast, web-standard)" },
+      { value: "fastify", label: "Fastify" },
+      { value: "express", label: "Express" }
+    ]
+  },
   target: {
     group: "core",
     type: "multiselect",
@@ -859,9 +870,10 @@ var service_default = {
   active: (cfg) => cfg.hasService,
   apply(cfg) {
     const ext = cfg.ext;
+    const fw = cfg.serviceFramework || "hono";
     const files = {
-      [`src/app.${ext}`]: appFile(cfg),
-      [`src/index.${ext}`]: serverFile(cfg),
+      [`src/app.${ext}`]: appFile(cfg, fw),
+      [`src/index.${ext}`]: serverFile(cfg, fw),
       Dockerfile: dockerfile(cfg),
       ".dockerignore": ["node_modules", "dist", "coverage", ".git", ".github", ".env", ".env.*", "!.env.example", "*.log", "Dockerfile", ".dockerignore", ""].join("\n")
     };
@@ -873,14 +885,47 @@ var service_default = {
           start: "node dist/index.js",
           dev: cfg.isTs ? "tsx watch src/index.ts" : "node --watch src/index.js"
         },
-        dependencies: { hono: "^4.5.0", "@hono/node-server": "^2.0.0" },
-        ...cfg.isTs ? { devDependencies: { tsx: "^4.0.0" } } : {}
+        dependencies: deps(fw),
+        devDependencies: {
+          ...cfg.isTs ? { tsx: "^4.0.0" } : {},
+          ...cfg.isTs ? typeDeps(fw) : {}
+        }
       }
     };
   }
 };
-function appFile(cfg) {
-  const t = cfg.isTs;
+function deps(fw) {
+  if (fw === "fastify") return { fastify: "^5.0.0" };
+  if (fw === "express") return { express: "^5.0.0" };
+  return { hono: "^4.5.0", "@hono/node-server": "^2.0.0" };
+}
+function typeDeps(fw) {
+  if (fw === "express") return { "@types/express": "^5.0.0" };
+  return {};
+}
+function appFile(cfg, fw) {
+  if (fw === "fastify") {
+    return [
+      `import Fastify from 'fastify';`,
+      ``,
+      `export const app = Fastify();`,
+      ``,
+      `app.get('/', async () => ({ ok: true, service: '${cfg.name}' }));`,
+      `app.get('/health', async () => 'ok');`,
+      ``
+    ].join("\n");
+  }
+  if (fw === "express") {
+    return [
+      `import express from 'express';`,
+      ``,
+      `export const app = express();`,
+      ``,
+      `app.get('/', (_req, res) => res.json({ ok: true, service: '${cfg.name}' }));`,
+      `app.get('/health', (_req, res) => res.send('ok'));`,
+      ``
+    ].join("\n");
+  }
   return [
     `import { Hono } from 'hono';`,
     ``,
@@ -891,13 +936,42 @@ function appFile(cfg) {
     ``
   ].join("\n");
 }
-function serverFile(cfg) {
+function serverFile(cfg, fw) {
+  const port = cfg.env ? "env.PORT" : "Number(process.env.PORT) || 3000";
+  const envImport = cfg.env ? `import { env } from './env.js';` : null;
+  if (fw === "fastify") {
+    return [
+      `import { app } from './app.js';`,
+      envImport,
+      ``,
+      `const port = ${port};`,
+      `app.listen({ port, host: '0.0.0.0' }).then((url) => {`,
+      `	console.log(\`Listening on \${url}\`);`,
+      `}).catch((err) => {`,
+      `	app.log.error(err);`,
+      `	process.exit(1);`,
+      `});`,
+      ``
+    ].filter((l) => l !== null).join("\n");
+  }
+  if (fw === "express") {
+    return [
+      `import { app } from './app.js';`,
+      envImport,
+      ``,
+      `const port = ${port};`,
+      `app.listen(port, () => {`,
+      `	console.log(\`Listening on http://localhost:\${port}\`);`,
+      `});`,
+      ``
+    ].filter((l) => l !== null).join("\n");
+  }
   return [
     `import { serve } from '@hono/node-server';`,
     `import { app } from './app.js';`,
-    cfg.env ? `import { env } from './env.js';` : null,
+    envImport,
     ``,
-    `const port = ${cfg.env ? "env.PORT" : "Number(process.env.PORT) || 3000"};`,
+    `const port = ${port};`,
     `serve({ fetch: app.fetch, port }, (info) => {`,
     `	console.log(\`Listening on http://localhost:\${info.port}\`);`,
     `});`,
@@ -1054,6 +1128,10 @@ import { svelteTesting } from '@testing-library/svelte/vite';`,
       if (cfg.isTs) pkg.devDependencies.tsx = "^4.0.0";
       files[`src/index.test.${testExt}`] = exampleTest("node", cfg);
     }
+    if (cfg.hasService && cfg.serviceFramework === "express") {
+      pkg.devDependencies.supertest = "^7.0.0";
+      if (cfg.isTs) pkg.devDependencies["@types/supertest"] = "^6.0.0";
+    }
     return { files, pkg };
   }
 };
@@ -1067,13 +1145,29 @@ function exampleTest(runner, cfg) {
   if (cfg.hasService) {
     const api2 = runner === "jest" ? "" : `import { describe, it, expect } from 'vitest';
 `;
+    const fw = cfg.serviceFramework || "hono";
+    let imports, call, statusProp;
+    if (fw === "fastify") {
+      imports = `import { app } from './app.js';`;
+      call = `await app.inject({ method: 'GET', url: '/' })`;
+      statusProp = "statusCode";
+    } else if (fw === "express") {
+      imports = `import request from 'supertest';
+import { app } from './app.js';`;
+      call = `await request(app).get('/')`;
+      statusProp = "status";
+    } else {
+      imports = `import { app } from './app.js';`;
+      call = `await app.request('/')`;
+      statusProp = "status";
+    }
     return [
-      api2 + `import { app } from './app.js';`,
+      api2 + imports,
       ``,
       `describe('app', () => {`,
       `	it('responds on /', async () => {`,
-      `		const res = await app.request('/');`,
-      `		expect(res.status).toBe(200);`,
+      `		const res = ${call};`,
+      `		expect(res.${statusProp}).toBe(200);`,
       `	});`,
       `});`,
       ``
@@ -2262,7 +2356,7 @@ function buildMonorepo(cfg) {
     }
   };
 }
-function addPackage(files, { name, dir, src, test, deps }) {
+function addPackage(files, { name, dir, src, test, deps: deps2 }) {
   const pkg = {
     name,
     version: "0.0.0",
@@ -2278,7 +2372,7 @@ function addPackage(files, { name, dir, src, test, deps }) {
       typecheck: "tsc --noEmit",
       lint: "eslint ."
     },
-    ...Object.keys(deps).length ? { dependencies: deps } : {}
+    ...Object.keys(deps2).length ? { dependencies: deps2 } : {}
   };
   files[`${dir}/package.json`] = toJson(pkg);
   files[`${dir}/tsconfig.json`] = toJson({ extends: "../../tsconfig.base.json", include: ["src"] });

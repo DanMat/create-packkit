@@ -68,6 +68,12 @@ export default {
       files[`src/index.test.${testExt}`] = exampleTest('node', cfg);
     }
 
+    // Express services test through supertest (no built-in inject).
+    if (cfg.hasService && cfg.serviceFramework === 'express') {
+      pkg.devDependencies.supertest = '^7.0.0';
+      if (cfg.isTs) pkg.devDependencies['@types/supertest'] = '^6.0.0';
+    }
+
     return { files, pkg };
   },
 };
@@ -82,13 +88,28 @@ function exampleTest(runner, cfg) {
   const imp = importPath(runner, cfg);
   if (cfg.hasService) {
     const api = runner === 'jest' ? '' : `import { describe, it, expect } from 'vitest';\n`;
+    const fw = cfg.serviceFramework || 'hono';
+    let imports, call, statusProp;
+    if (fw === 'fastify') {
+      imports = `import { app } from './app.js';`;
+      call = `await app.inject({ method: 'GET', url: '/' })`;
+      statusProp = 'statusCode';
+    } else if (fw === 'express') {
+      imports = `import request from 'supertest';\nimport { app } from './app.js';`;
+      call = `await request(app).get('/')`;
+      statusProp = 'status';
+    } else {
+      imports = `import { app } from './app.js';`;
+      call = `await app.request('/')`;
+      statusProp = 'status';
+    }
     return [
-      api + `import { app } from './app.js';`,
+      api + imports,
       ``,
       `describe('app', () => {`,
       `\tit('responds on /', async () => {`,
-      `\t\tconst res = await app.request('/');`,
-      `\t\texpect(res.status).toBe(200);`,
+      `\t\tconst res = ${call};`,
+      `\t\texpect(res.${statusProp}).toBe(200);`,
       `\t});`,
       `});`,
       ``,
