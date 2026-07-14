@@ -130,13 +130,23 @@ test('every preset has an info gist', () => {
   for (const name of Object.keys(PRESETS)) assert.ok(PRESET_INFO[name], `info for ${name}`);
 });
 
-test('ts-lib: valid package.json with dual exports + per-condition types', () => {
+test('ts-lib: ESM-only package.json by default (no require condition)', () => {
   const out = generate(fromPreset('ts-lib', { name: 'x-lib' }));
   assert.ok(out.files['src/index.ts']);
   const pkg = JSON.parse(out.files['package.json']);
   assert.equal(pkg.name, 'x-lib');
   assert.equal(pkg.type, 'module');
   assert.equal(pkg.license, 'MIT');
+  // ESM-only: import condition only, no CJS surface.
+  assert.equal(pkg.exports['.'].import.types, './dist/index.d.ts');
+  assert.equal(pkg.exports['.'].import.default, './dist/index.js');
+  assert.equal(pkg.exports['.'].require, undefined);
+  assert.equal(pkg.main, './dist/index.js');
+});
+
+test('--module dual: per-condition types (import → .d.ts, require → .d.cts)', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'x-lib', moduleFormat: 'dual' }));
+  const pkg = JSON.parse(out.files['package.json']);
   // import → .d.ts, require → .d.cts (publint / are-the-types-wrong correct)
   assert.equal(pkg.exports['.'].import.types, './dist/index.d.ts');
   assert.equal(pkg.exports['.'].import.default, './dist/index.js');
