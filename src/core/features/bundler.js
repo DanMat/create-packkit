@@ -46,6 +46,9 @@ export default {
       pkg.scripts.build = tool;
       pkg.scripts.dev = `${tool} --watch`;
       pkg.devDependencies = { [tool]: tool === 'tsup' ? '^8.0.0' : '^0.6.0' };
+      // tsup/tsdown resolve `typescript` even for plain-JS builds; TS projects
+      // already get it from the typescript feature.
+      if (!cfg.isTs) pkg.devDependencies.typescript = '^5.5.0';
     } else if (cfg.bundler === 'unbuild') {
       files['build.config.ts'] = unbuildConfig(cfg);
       pkg.scripts.build = 'unbuild';
