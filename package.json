@@ -1,6 +1,6 @@
 {
   "name": "create-packkit",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Highly configurable scaffolder for modern npm packages and CLIs — pick your stack (TS/JS, bundler, tests, linter, CI, releases) from a CLI or a web configurator.",
   "type": "module",
   "bin": {
