@@ -21,6 +21,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 ## Next up
 - [x] ~~**Monorepo target** — pnpm/turbo workspaces with multiple packages.~~ **Shipped** (`monorepo` preset).
 - [x] ~~**Template dependency freshness**~~ — **Shipped**: `npm run check:deps` + a weekly Action that opens an issue when a version we write into generated projects falls a major behind (the versions Dependabot can't see). Keeps the templates honest.
+- [x] ~~**End-to-end integration tests**~~ — **Shipped**: a matrix Action (`integration.yml`) that generates every preset, installs it, and runs its real checks (build/test/typecheck/lint, plus starting services and hitting `/health`). Runs on any change to generation logic or template deps — so a version bump can't silently break generated projects. Local: `npm run integration -- <preset>`.
 - [x] ~~**One-command recommended scaffold**~~ — **Shipped**: `--recommended` (alias of `-y`), config flags imply non-interactive, and the web emits a runnable one-shot.
 - [ ] **Refresh the flagged template deps** — the freshness checker currently flags ~26 deps a major behind (vite 8, vitest 4, typescript 7, eslint 10, storybook 10, …). Bump + verify per-dep (React already done → 19).
 - [ ] **Vue/Svelte app scaffolds with a router** (currently minimal SPAs).

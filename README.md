@@ -80,6 +80,13 @@ Packkit is a pure `config → { files }` **core** that runs in both Node and the
 
 Both drive from one options schema ([`src/core/options.js`](src/core/options.js)), so the CLI and the web page always stay in sync.
 
+## Staying fresh
+
+Two GitHub Actions keep the templates honest:
+
+- **Dependency freshness** — a weekly check flags any version Packkit writes into generated projects that's fallen a major behind (versions Dependabot can't see), and opens an issue.
+- **Integration** — on any change to generation logic or a template dependency, it generates every preset, installs it, and runs its real checks (build/test/lint, and actually starts services) — so an update can't silently break the projects you'd get.
+
 ## License
 
 [MIT](LICENSE) © DanMat

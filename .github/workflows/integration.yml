@@ -1,0 +1,53 @@
+name: Integration (generated projects)
+# Generates each preset, installs it, and runs its own checks (build/test/…),
+# so a change to generation logic or a template dependency version can't
+# silently break the projects Packkit produces.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/core/**'
+      - 'bin/**'
+      - 'scripts/integration.mjs'
+  pull_request:
+    paths:
+      - 'src/core/**'
+      - 'bin/**'
+      - 'scripts/integration.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset:
+          - ts-lib
+          - js-lib
+          - cli
+          - react-lib
+          - react-app
+          - vue-lib
+          - vue-app
+          - svelte-lib
+          - svelte-app
+          - node-service
+          - monorepo
+          - oss
+          - full
+          - minimal
+          - react-lib --storybook
+    name: ${{ matrix.preset }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/integration.mjs ${{ matrix.preset }}
