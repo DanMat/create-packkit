@@ -40,7 +40,8 @@ Options:
   --language <ts|js>  --module <esm|cjs|dual>  --framework <none|react|vue|svelte>
   --target <library|cli|service|app>   (repeatable)   --storybook
   --bundler <tsup|tsdown|unbuild|rollup|none>   --minify
-  --test <vitest|jest|node|none>  --lint <eslint-prettier|biome|oxlint|none>
+  --test <vitest|jest|node|none>   --e2e (Playwright, for apps)
+  --lint <eslint-prettier|biome|oxlint|none>
   --hooks <simple-git-hooks|husky|lefthook|none>  --release <changesets|release-it|np|none>
   --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
   --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>

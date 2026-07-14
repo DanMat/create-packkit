@@ -8,6 +8,7 @@ import frameworks from './frameworks.js';
 import vite from './vite.js';
 import service from './service.js';
 import test from './test.js';
+import e2e from './e2e.js';
 import lint from './lint.js';
 import githooks from './githooks.js';
 import release from './release.js';
@@ -29,6 +30,7 @@ export default [
   vite,
   service,
   test,
+  e2e,
   lint,
   githooks,
   release,

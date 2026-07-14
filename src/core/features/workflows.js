@@ -41,6 +41,7 @@ export default {
     if (wf.includes('pages')) files['.github/workflows/pages.yml'] = pagesWorkflow(cfg);
     if (wf.includes('codeql')) files['.github/workflows/codeql.yml'] = codeqlWorkflow();
     if (wf.includes('stale')) files['.github/workflows/stale.yml'] = staleWorkflow();
+    if (cfg.e2e && cfg.hasApp && wf.includes('ci')) files['.github/workflows/e2e.yml'] = e2eWorkflow(cfg);
 
     if (cfg.deps === 'renovate') {
       files['.github/renovate.json'] = toJson({
@@ -195,6 +196,30 @@ function codeqlWorkflow() {
     '        with:',
     '          languages: javascript-typescript',
     '      - uses: github/codeql-action/analyze@v3',
+    '',
+  ].join('\n');
+}
+
+function e2eWorkflow(cfg) {
+  return [
+    'name: E2E',
+    'on:',
+    '  push:',
+    '    branches: [main]',
+    '  pull_request:',
+    'jobs:',
+    '  e2e:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    setupSteps(cfg),
+    '      - run: npx playwright install --with-deps chromium',
+    `      - run: ${pmRun(cfg, 'test:e2e')}`,
+    '      - uses: actions/upload-artifact@v4',
+    '        if: ${{ !cancelled() }}',
+    '        with:',
+    '          name: playwright-report',
+    '          path: playwright-report/',
+    '          retention-days: 7',
     '',
   ].join('\n');
 }

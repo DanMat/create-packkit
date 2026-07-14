@@ -96,6 +96,7 @@ export const OPTIONS = {
   },
   coverage: { group: 'quality', type: 'boolean', label: 'Coverage reporting', default: true },
   storybook: { group: 'quality', type: 'boolean', label: 'Storybook (component libraries)', default: false },
+  e2e: { group: 'quality', type: 'boolean', label: 'Playwright end-to-end tests (apps)', default: false },
   pkgChecks: { group: 'quality', type: 'boolean', label: 'Package checks (publint + are-the-types-wrong)', default: false },
   knip: { group: 'quality', type: 'boolean', label: 'Knip (unused files / deps / exports)', default: false },
 
@@ -244,6 +245,9 @@ export function normalizeConfig(input = {}) {
 
   // Storybook only applies to component libraries.
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+
+  // Playwright E2E only applies to app targets.
+  if (!cfg.hasApp) cfg.e2e = false;
 
   // A monorepo is its own generation path (see buildMonorepo); it has a build.
   if (cfg.monorepo) cfg.hasBuild = true;

@@ -35,16 +35,28 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 
 **On defaults:** tsup + ESLint/Prettier + Vitest + Changesets stay the conservative, best-supported defaults; tsdown/Biome/oxlint are one click away.
 
-## Next up
+**Node versions:** offered lines + the default (Active LTS) are derived from Node's own release schedule + dist index (`scripts/update-node-versions.mjs`, refreshed weekly), so LTS/Current tracking never needs hand-editing.
 
-- [ ] **Vue/Svelte app scaffolds with a router** — the app targets are currently minimal SPAs; add vue-router / SvelteKit-style routing (matches the React Router option we should add too).
-- [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
-- [ ] **E2E option — Playwright** for the app targets (config + example test + CI job).
+## Next up (working order)
+
+- [x] ~~**E2E option — Playwright** for the app targets (config + example spec + CI job).~~ — **Shipped (2.1).** `--e2e` on any app.
 - [ ] **`size-limit`** — bundle-size budget check for libraries (config + CI).
 - [ ] **Import an existing `package.json`** to pre-fill the web configurator (paste/upload → detect name/description/author/type).
 - [ ] **Share a config as a URL** — encode the selection in the query string so a configured setup is linkable.
 - [ ] **More service frameworks** — Fastify / Express alongside Hono.
 - [ ] **Postinstall doctor** — check the local Node / package-manager versions match `engines`, warn if not.
+- [ ] **Vue/Svelte app scaffolds with a router** — the app targets are minimal SPAs; add vue-router / SvelteKit-style routing (plus a React Router option).
+- [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
+
+## Ideas from real-world research (2026)
+_From mining pain points across create-typescript-app, tsup, Changesets, create-t3-app, and current "publish an npm package" guides. Ordered by demand × fit._
+
+- [ ] **Type-safe env validation** — `src/env.ts` (Zod / `@t3-oss/env`) + `.env.example`; fail fast on bad config. Highest-demand gap for CLI/service/app targets.
+- [ ] **Snapshot / canary releases** — Action to publish `x.y.z-canary.<hash>` to a dist-tag per PR/push. The loudest recurring Changesets request.
+- [ ] **Docs site generator** — Starlight / VitePress / Nextra + Pages deploy (reuses existing Pages plumbing).
+- [ ] **Production Dockerfile for services** — multi-stage, distroless/slim, non-root, `.dockerignore`, healthcheck (Hono + future Fastify/Express).
+- [ ] **Sourcemaps + declaration maps** — emit `.js.map`/`.d.ts.map` and ship source; fixes a widely-hit tsup footgun. Near-zero effort.
+- [ ] **API docs (TypeDoc)** · **CSS/asset handling for component libs** (`sideEffects`) · **runnable examples + StackBlitz/CodeSandbox buttons** · **all-contributors** · **CLI ergonomics kit** (commander/citty + testable handlers) · **repo settings-as-code** (`.github/settings.yml`) · **benchmarks** (tinybench/mitata) · **cspell + markdownlint** · **OpenSSF Scorecard + SLSA** · **target-aware `moduleResolution` defaults**.
 
 ## Agent / automation reach
 - [x] ~~Non-interactive CLI + flag parity · `--schema` + `llms.txt` · preset shortcuts · MCP server~~ — **Shipped.**

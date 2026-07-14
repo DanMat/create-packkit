@@ -88,6 +88,22 @@ if (scripts.dev) {
   await new Promise((r) => setTimeout(r, 500)); // free the port before the service check
 }
 
+// 3c) e2e: install a browser and run the Playwright suite when present. This
+// boots the app's dev server via playwright's webServer, so it also proves the
+// app actually serves.
+if (scripts['test:e2e']) {
+  console.log('\n$ npx playwright install --with-deps chromium');
+  if (!step('npx', ['playwright', 'install', '--with-deps', 'chromium'], { cwd: app })) {
+    console.error(`\n✗ [${label}] playwright browser install failed`);
+    process.exit(1);
+  }
+  const ok = pm === 'npm' ? step('npm', ['run', 'test:e2e'], { cwd: app }) : step(pm, ['test:e2e'], { cwd: app });
+  if (!ok) {
+    console.error(`\n✗ [${label}] "test:e2e" failed`);
+    process.exit(1);
+  }
+}
+
 // 4) services: prove the built server actually starts and responds
 if (scripts.start && pkg.dependencies && pkg.dependencies.hono) {
   console.log('\n$ node dist/index.js  (checking /health)');

@@ -161,6 +161,21 @@ test('cli preset: adds a bin and cli entry', () => {
   assert.ok(out.files['src/cli.ts']);
 });
 
+test('e2e: react-app --e2e adds Playwright config, spec, script, workflow', () => {
+  const out = generate(fromPreset('react-app', { name: 'demo-app', e2e: true, workflows: ['ci'] }));
+  assert.ok(out.files['playwright.config.ts']);
+  assert.ok(out.files['e2e/app.spec.ts']);
+  assert.ok(out.files['.github/workflows/e2e.yml']);
+  const pkg = JSON.parse(out.files['package.json']);
+  assert.equal(pkg.scripts['test:e2e'], 'playwright test');
+  assert.ok(pkg.devDependencies['@playwright/test']);
+});
+
+test('e2e: ignored for non-app targets', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'x', e2e: true }));
+  assert.ok(!out.files['playwright.config.ts']);
+});
+
 test('full preset: workflows + community + agents present', () => {
   const out = generate(fromPreset('full', { name: 'z' }));
   assert.ok(out.files['.github/workflows/ci.yml']);

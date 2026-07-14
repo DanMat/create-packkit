@@ -10,6 +10,11 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# test artifacts (Playwright)
+test-results/
+playwright-report/
+playwright/.cache/
+
 # logs
 *.log
 npm-debug.log*

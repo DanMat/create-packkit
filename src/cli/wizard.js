@@ -36,6 +36,9 @@ export async function runWizard(seed = {}) {
     cfg.minify = bail(await p.confirm({ message: 'Minify the build output?', initialValue: false }));
   }
   cfg.test = bail(await p.select({ message: 'Test runner', options: asOptions('test'), initialValue: OPTIONS.test.default }));
+  if (cfg.target.includes('app')) {
+    cfg.e2e = bail(await p.confirm({ message: 'Add Playwright end-to-end tests?', initialValue: false }));
+  }
   cfg.lint = bail(await p.select({ message: 'Lint / format', options: asOptions('lint'), initialValue: OPTIONS.lint.default }));
   cfg.gitHooks = bail(await p.select({ message: 'Git hooks', options: asOptions('gitHooks'), initialValue: OPTIONS.gitHooks.default }));
   cfg.release = bail(await p.select({ message: 'Release / versioning', options: asOptions('release'), initialValue: OPTIONS.release.default }));

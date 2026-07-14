@@ -47,6 +47,7 @@ jobs:
           - ts-lib --bundler rollup
           - ts-lib --bundler unbuild
           - cli --hooks lefthook
+          - react-app --e2e
     name: ${{ matrix.preset }}
     steps:
       - uses: actions/checkout@v4

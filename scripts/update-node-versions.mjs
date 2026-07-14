@@ -74,6 +74,11 @@ for (const [key, s] of Object.entries(schedule)) {
 // within a status.
 lines.sort((a, b) => RANK[a.status] - RANK[b.status] || b.major - a.major);
 
+// The default is DERIVED, never hardcoded: whichever line the schedule marks
+// Active LTS today (newest first, since `lines` is sorted). If we're briefly
+// between LTS cutovers with no Active LTS, fall back to the best available
+// (Maintenance LTS, then Current). This is why the default self-maintains — a
+// new Active LTS automatically becomes the default on the next refresh.
 const active = lines.find((l) => l.status === 'active-lts') || lines[0];
 const DEFAULT_NODE = String(active.major);
 

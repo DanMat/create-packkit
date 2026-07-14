@@ -126,6 +126,7 @@ var OPTIONS = {
   },
   coverage: { group: "quality", type: "boolean", label: "Coverage reporting", default: true },
   storybook: { group: "quality", type: "boolean", label: "Storybook (component libraries)", default: false },
+  e2e: { group: "quality", type: "boolean", label: "Playwright end-to-end tests (apps)", default: false },
   pkgChecks: { group: "quality", type: "boolean", label: "Package checks (publint + are-the-types-wrong)", default: false },
   knip: { group: "quality", type: "boolean", label: "Knip (unused files / deps / exports)", default: false },
   // ---- lint / format ----
@@ -260,6 +261,7 @@ function normalizeConfig(input = {}) {
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
   if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+  if (!cfg.hasApp) cfg.e2e = false;
   if (cfg.monorepo) cfg.hasBuild = true;
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   if (!cfg.publishable) cfg.pkgChecks = false;
@@ -1082,6 +1084,46 @@ function jestConfig(cfg) {
   ].join("\n");
 }
 
+// src/core/features/e2e.js
+var DEV_URL = "http://localhost:5173";
+var runDev = (cfg) => cfg.packageManager === "npm" ? "npm run dev" : `${cfg.packageManager} dev`;
+var e2e_default = {
+  id: "e2e",
+  active: (cfg) => cfg.e2e && cfg.hasApp,
+  apply(cfg) {
+    const ext = cfg.ext;
+    const files = {};
+    const pkg = { scripts: {}, devDependencies: { "@playwright/test": "^1.50.0" } };
+    files[`playwright.config.${ext}`] = [
+      `import { defineConfig, devices } from '@playwright/test';`,
+      ``,
+      `export default defineConfig({`,
+      `	testDir: './e2e',`,
+      `	use: { baseURL: '${DEV_URL}', trace: 'on-first-retry' },`,
+      `	// Playwright starts the app for you and waits for it to be ready.`,
+      `	webServer: {`,
+      `		command: '${runDev(cfg)}',`,
+      `		url: '${DEV_URL}',`,
+      `		reuseExistingServer: !process.env.CI,`,
+      `	},`,
+      `	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],`,
+      `});`,
+      ``
+    ].join("\n");
+    files[`e2e/app.spec.${ext}`] = [
+      `import { test, expect } from '@playwright/test';`,
+      ``,
+      `test('renders the app', async ({ page }) => {`,
+      `	await page.goto('/');`,
+      `	await expect(page.getByRole('heading', { name: /Hello from/ })).toBeVisible();`,
+      `});`,
+      ``
+    ].join("\n");
+    pkg.scripts["test:e2e"] = "playwright test";
+    return { files, pkg };
+  }
+};
+
 // src/core/features/lint.js
 var lint_default = {
   id: "lint",
@@ -1363,6 +1405,7 @@ var workflows_default = {
     if (wf.includes("pages")) files[".github/workflows/pages.yml"] = pagesWorkflow(cfg);
     if (wf.includes("codeql")) files[".github/workflows/codeql.yml"] = codeqlWorkflow();
     if (wf.includes("stale")) files[".github/workflows/stale.yml"] = staleWorkflow();
+    if (cfg.e2e && cfg.hasApp && wf.includes("ci")) files[".github/workflows/e2e.yml"] = e2eWorkflow(cfg);
     if (cfg.deps === "renovate") {
       files[".github/renovate.json"] = toJson({
         $schema: "https://docs.renovatebot.com/renovate-schema.json",
@@ -1505,6 +1548,29 @@ function codeqlWorkflow() {
     "        with:",
     "          languages: javascript-typescript",
     "      - uses: github/codeql-action/analyze@v3",
+    ""
+  ].join("\n");
+}
+function e2eWorkflow(cfg) {
+  return [
+    "name: E2E",
+    "on:",
+    "  push:",
+    "    branches: [main]",
+    "  pull_request:",
+    "jobs:",
+    "  e2e:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    setupSteps(cfg),
+    "      - run: npx playwright install --with-deps chromium",
+    `      - run: ${pmRun(cfg, "test:e2e")}`,
+    "      - uses: actions/upload-artifact@v4",
+    "        if: ${{ !cancelled() }}",
+    "        with:",
+    "          name: playwright-report",
+    "          path: playwright-report/",
+    "          retention-days: 7",
     ""
   ].join("\n");
 }
@@ -1869,6 +1935,11 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# test artifacts (Playwright)
+test-results/
+playwright-report/
+playwright/.cache/
+
 # logs
 *.log
 npm-debug.log*
@@ -1917,6 +1988,7 @@ var features_default = [
   vite_default,
   service_default,
   test_default,
+  e2e_default,
   lint_default,
   githooks_default,
   release_default,

@@ -48,6 +48,7 @@ export function parseCliArgs(argv) {
       minify: { type: 'boolean' },
       monorepo: { type: 'boolean' },
       storybook: { type: 'boolean' },
+      e2e: { type: 'boolean' },
       'pkg-checks': { type: 'boolean' },
       knip: { type: 'boolean' },
       jsr: { type: 'boolean' },
@@ -74,6 +75,7 @@ export function parseCliArgs(argv) {
   if (values.minify) overrides.minify = true;
   if (values.monorepo) overrides.monorepo = true;
   if (values.storybook) overrides.storybook = true;
+  if (values.e2e) overrides.e2e = true;
   if (values['pkg-checks']) overrides.pkgChecks = true;
   if (values.knip) overrides.knip = true;
   if (values.jsr) overrides.jsr = true;
