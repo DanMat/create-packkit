@@ -1,0 +1,45 @@
+name: Refresh Node versions
+on:
+  schedule:
+    - cron: '0 10 * * 1' # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+
+      # Re-derive offered Node lines + pins from nodejs.org, then rebuild the
+      # web bundle so the configurator matches.
+      - run: node scripts/update-node-versions.mjs
+      - run: npm run build:web
+
+      - name: Open a PR when the Node lines changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- src/core/node-versions.js docs/packkit-core.js; then
+            echo "Node versions already current — nothing to do."
+            exit 0
+          fi
+          BRANCH="chore/refresh-node-versions"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add src/core/node-versions.js docs/packkit-core.js
+          git commit -m "chore: refresh offered Node versions from upstream"
+          git push -f origin "$BRANCH"
+          gh pr view "$BRANCH" >/dev/null 2>&1 || gh pr create \
+            --title "chore: refresh offered Node versions" \
+            --body "Auto-generated from nodejs.org/dist + the Node release schedule. Review the new default / offered lines, then merge to pick up new LTS/Current releases." \
+            --head "$BRANCH"

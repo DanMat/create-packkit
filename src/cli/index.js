@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
-import { nodeFloor, meetsNodeFloor } from '../core/node.js';
+import { engineFloor, meetsNodeFloor } from '../core/node.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
 import { writeProject, dirIsEmptyOrMissing, gitInit, installDeps } from './write.js';
@@ -92,7 +92,7 @@ export async function run(argv = process.argv.slice(2)) {
   // require this floor. npm only *warns* on engines, so catch it here — clearly,
   // once — instead of letting a doomed install spew EBADENGINE and leave a broken
   // project. This is the signal both humans and agents need up front.
-  const floor = nodeFloor(config.nodeVersion);
+  const floor = engineFloor(config.nodeVersion);
   const nodeOk = meetsNodeFloor(process.version, floor);
   if (!nodeOk) {
     const lines = [

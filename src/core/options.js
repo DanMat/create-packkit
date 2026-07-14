@@ -2,7 +2,13 @@
 // Both the CLI wizard and the web configurator render from this schema, and
 // `normalizeConfig` turns partial/user input into a complete, valid config.
 
+import { NODE_LINES, DEFAULT_NODE } from './node.js';
+
 /** @typedef {'select'|'multiselect'|'boolean'|'text'} OptionType */
+
+// Node choices are derived from Node's own release schedule (see node-versions.js)
+// so the LTS/Current lines and their patches stay current without hand-editing.
+const NODE_CHOICES = Object.entries(NODE_LINES).map(([value, info]) => ({ value, label: info.label }));
 
 export const OPTIONS = {
   // ---- package metadata ----
@@ -59,12 +65,8 @@ export const OPTIONS = {
     ],
   },
   nodeVersion: {
-    group: 'core', type: 'select', label: 'Node version', default: '20',
-    choices: [
-      { value: '20', label: '20 (LTS, ≥20.19)' },
-      { value: '22', label: '22 (LTS, ≥22.12)' },
-      { value: '24', label: '24 (Current)' },
-    ],
+    group: 'core', type: 'select', label: 'Node version', default: DEFAULT_NODE,
+    choices: NODE_CHOICES,
   },
 
   // ---- build ----

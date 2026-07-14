@@ -26,7 +26,8 @@
     "test": "node --test",
     "check:deps": "node scripts/check-template-deps.mjs",
     "integration": "node scripts/integration.mjs",
-    "build:web": "esbuild src/core/index.js --bundle --format=esm --outfile=docs/packkit-core.js"
+    "build:web": "esbuild src/core/index.js --bundle --format=esm --outfile=docs/packkit-core.js",
+    "update:node": "node scripts/update-node-versions.mjs"
   },
   "repository": {
     "type": "git",

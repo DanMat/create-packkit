@@ -13,7 +13,7 @@ const IGNORE = new Set(['@types/node']);
 const HELD = {
   typescript: 'typescript-eslint peers typescript <6.1.0 (no TS 7 support yet)',
   knip: 'v6 crashes on the oxc-parser native binding',
-  'lint-staged': 'v17 requires Node >=22.22.1; hold at 16 to keep Node 20 LTS support',
+  'lint-staged': 'v17 requires Node >=22.22.1, above our Node 22 engines floor; hold at 16 to keep the Maintenance-LTS line working',
 };
 const isSemverish = (v) => /^[\^~>=]*\d+\.\d+/.test(v) || /^[\^~>=]*\d+$/.test(v);
 const floorMajor = (v) => parseInt(String(v).replace(/^[\^~>=v\s]+/, ''), 10);

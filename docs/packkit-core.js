@@ -1,4 +1,18 @@
+// src/core/node-versions.js
+var NODE_LINES = {
+  "24": { version: "24.18.0", status: "active-lts", codename: "Krypton", label: '24 (Active LTS, "Krypton")' },
+  "22": { version: "22.23.1", status: "maintenance", codename: "Jod", label: '22 (Maintenance LTS, "Jod")' },
+  "26": { version: "26.5.0", status: "current", codename: null, label: "26 (Current)" }
+};
+var DEFAULT_NODE = "24";
+
+// src/core/node.js
+var ENGINE_MIN = { 18: "18.18.0", 20: "20.19.0", 22: "22.13.0" };
+var engineFloor = (v) => ENGINE_MIN[v] || `${v}.0.0`;
+var nodePin = (v) => NODE_LINES[v]?.version || engineFloor(v);
+
 // src/core/options.js
+var NODE_CHOICES = Object.entries(NODE_LINES).map(([value, info]) => ({ value, label: info.label }));
 var OPTIONS = {
   // ---- package metadata ----
   name: { group: "meta", type: "text", label: "Package name", default: "my-package" },
@@ -74,12 +88,8 @@ var OPTIONS = {
     group: "core",
     type: "select",
     label: "Node version",
-    default: "20",
-    choices: [
-      { value: "20", label: "20 (LTS, \u226520.19)" },
-      { value: "22", label: "22 (LTS, \u226522.12)" },
-      { value: "24", label: "24 (Current)" }
-    ]
+    default: DEFAULT_NODE,
+    choices: NODE_CHOICES
   },
   // ---- build ----
   bundler: {
@@ -325,10 +335,6 @@ function sortKeys(obj) {
   return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
 }
 
-// src/core/node.js
-var NODE_FLOOR = { 18: "18.18.0", 20: "20.19.0", 22: "22.12.0", 24: "24.0.0" };
-var nodeFloor = (v) => NODE_FLOOR[v] || `${v}.0.0`;
-
 // src/core/features/meta.js
 var meta_default = {
   id: "meta",
@@ -340,7 +346,7 @@ var meta_default = {
       version: "0.0.0",
       description: cfg.description || "",
       type: cfg.moduleFormat === "cjs" ? "commonjs" : "module",
-      engines: { node: `>=${nodeFloor(cfg.nodeVersion)}` },
+      engines: { node: `>=${engineFloor(cfg.nodeVersion)}` },
       scripts: {}
     };
     const kw = String(cfg.keywords || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -356,7 +362,7 @@ var meta_default = {
       files[`src/index.${cfg.ext}`] = libraryEntry(cfg);
     }
     files["README.md"] = readme(cfg);
-    files[".nvmrc"] = `${nodeFloor(cfg.nodeVersion)}
+    files[".nvmrc"] = `${nodePin(cfg.nodeVersion)}
 `;
     if (cfg.isTs) {
       pkg.scripts.typecheck = cfg.isVue ? "vue-tsc --noEmit" : cfg.isSvelte ? "svelte-check --tsconfig ./tsconfig.json" : "tsc --noEmit";
@@ -424,7 +430,7 @@ function readme(cfg) {
   lines.push(
     "## Requirements",
     "",
-    `Node.js >= ${nodeFloor(cfg.nodeVersion)} (\`.nvmrc\` pins it; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
+    `Node.js >= ${engineFloor(cfg.nodeVersion)} (\`.nvmrc\` pins ${nodePin(cfg.nodeVersion)}; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
     ""
   );
   lines.push("## Install", "", "```sh", install, "```", "");

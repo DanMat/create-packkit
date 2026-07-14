@@ -1,6 +1,6 @@
 // Always-on: base package.json descriptive fields + the source entry + README.
 
-import { nodeFloor } from '../node.js';
+import { engineFloor, nodePin } from '../node.js';
 
 export default {
   id: 'meta',
@@ -12,7 +12,7 @@ export default {
       version: '0.0.0',
       description: cfg.description || '',
       type: cfg.moduleFormat === 'cjs' ? 'commonjs' : 'module',
-      engines: { node: `>=${nodeFloor(cfg.nodeVersion)}` },
+      engines: { node: `>=${engineFloor(cfg.nodeVersion)}` },
       scripts: {},
     };
 
@@ -35,8 +35,9 @@ export default {
     // README
     files['README.md'] = readme(cfg);
 
-    // Node version pin — the honest floor, so `nvm use` can't land below it.
-    files['.nvmrc'] = `${nodeFloor(cfg.nodeVersion)}\n`;
+    // Node version pin — that line's newest patch (from Node's own data), so
+    // `nvm use` lands on a current, real release.
+    files['.nvmrc'] = `${nodePin(cfg.nodeVersion)}\n`;
 
     // A typecheck script for TS projects — framework-aware (plain tsc can't
     // resolve .vue/.svelte modules).
@@ -118,7 +119,7 @@ function readme(cfg) {
   lines.push(
     '## Requirements',
     '',
-    `Node.js >= ${nodeFloor(cfg.nodeVersion)} (\`.nvmrc\` pins it; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
+    `Node.js >= ${engineFloor(cfg.nodeVersion)} (\`.nvmrc\` pins ${nodePin(cfg.nodeVersion)}; run \`nvm use\`). Enforced via \`engine-strict\`, so installs fail fast on an unsupported version.`,
     '',
   );
 
