@@ -2,7 +2,11 @@
 
 Planned and considered features for Packkit. Not commitments — a backlog to pull from. PRs and 👍s welcome.
 
-## Shipped (through 1.5)
+## Shipped (through 2.0)
+
+**2.0 — ESM-only by default** _(breaking)_
+- New libraries default to **ESM-only** output (Node 20.19+/22.12+ can `require()` ESM), matching where the ecosystem is heading — smaller `exports`, no `.cjs`/`.d.cts`, one build format. **Dual (ESM + CJS)** stays one click / `--module dual` away, and CJS-only is still there. Library presets (`ts-lib`, `js-lib`, `react-lib`, `oss`, `full`, `minimal`) follow the new default.
+
 
 **Generation**
 - Core `config → files` engine (runs in Node **and** the browser)
@@ -33,7 +37,6 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 
 ## Next up
 
-- [ ] **ESM-only guidance / default** — surface ESM-only as the recommended default for new libraries (Node 20.19+/22+ can `require()` ESM), keeping dual as an option. _If we flip the default, that's the natural **2.0** (a breaking change to default output)._
 - [ ] **Vue/Svelte app scaffolds with a router** — the app targets are currently minimal SPAs; add vue-router / SvelteKit-style routing (matches the React Router option we should add too).
 - [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
 - [ ] **E2E option — Playwright** for the app targets (config + example test + CI job).

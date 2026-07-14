@@ -33,7 +33,7 @@ No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/
 | Area | Options |
 |---|---|
 | **Language** | TypeScript (strict) · JavaScript (ESM) |
-| **Module format** | ESM · CJS · dual (proper `exports` map) |
+| **Module format** | **ESM-only (default)** · dual (ESM + CJS) · CJS — proper `exports` map |
 | **Target** | Library · CLI tool · **HTTP service (Hono)** · **App (Vite SPA)** · any combination |
 | **Framework** | None · **React** · **Vue** · **Svelte** (component libraries or apps) |
 | **Storybook** | optional, for React / Vue / Svelte component libraries |

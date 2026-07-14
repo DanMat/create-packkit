@@ -21,11 +21,11 @@ export const OPTIONS = {
     ],
   },
   moduleFormat: {
-    group: 'core', type: 'select', label: 'Module format', default: 'dual',
+    group: 'core', type: 'select', label: 'Module format', default: 'esm',
     choices: [
-      { value: 'esm', label: 'ESM only' },
-      { value: 'cjs', label: 'CommonJS only' },
+      { value: 'esm', label: 'ESM only (recommended)' },
       { value: 'dual', label: 'Dual (ESM + CJS)' },
+      { value: 'cjs', label: 'CommonJS only' },
     ],
   },
   target: {

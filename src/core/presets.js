@@ -2,12 +2,12 @@
 // the wizard: `npx packkit ts-lib my-project`.
 
 export const PRESETS = {
-  'ts-lib': { language: 'ts', target: ['library'], moduleFormat: 'dual' },
-  'js-lib': { language: 'js', target: ['library'], moduleFormat: 'dual', bundler: 'tsup' },
+  'ts-lib': { language: 'ts', target: ['library'], moduleFormat: 'esm' },
+  'js-lib': { language: 'js', target: ['library'], moduleFormat: 'esm', bundler: 'tsup' },
   'ts-cli': { language: 'ts', target: ['cli', 'library'], moduleFormat: 'esm' },
   cli: { language: 'ts', target: ['cli', 'library'], moduleFormat: 'esm' },
-  'react-lib': { language: 'ts', framework: 'react', target: ['library'], moduleFormat: 'dual', test: 'vitest' },
-  'react-lib-js': { language: 'js', framework: 'react', target: ['library'], moduleFormat: 'dual', bundler: 'tsup', test: 'vitest' },
+  'react-lib': { language: 'ts', framework: 'react', target: ['library'], moduleFormat: 'esm', test: 'vitest' },
+  'react-lib-js': { language: 'js', framework: 'react', target: ['library'], moduleFormat: 'esm', bundler: 'tsup', test: 'vitest' },
   'react-app': { language: 'ts', framework: 'react', target: ['app'], test: 'vitest', release: 'none', workflows: ['ci'] },
   'vue-lib': { language: 'ts', framework: 'vue', target: ['library'], test: 'vitest' },
   'vue-app': { language: 'ts', framework: 'vue', target: ['app'], test: 'vitest', release: 'none', workflows: ['ci'] },
@@ -20,19 +20,19 @@ export const PRESETS = {
   },
   monorepo: { monorepo: true, language: 'ts', packageManager: 'pnpm' },
   oss: {
-    language: 'ts', target: ['library'], moduleFormat: 'dual', bundler: 'tsup',
+    language: 'ts', target: ['library'], moduleFormat: 'esm', bundler: 'tsup',
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
     release: 'changesets', workflows: ['ci', 'npm-publish', 'codeql', 'codecov'],
     deps: 'renovate', community: true, agents: true, vscode: true,
     pkgChecks: true, knip: true,
   },
   minimal: {
-    language: 'ts', target: ['library'], moduleFormat: 'dual', bundler: 'tsup',
+    language: 'ts', target: ['library'], moduleFormat: 'esm', bundler: 'tsup',
     test: 'none', lint: 'none', gitHooks: 'none', release: 'none',
     workflows: ['ci'], deps: 'none', community: false, agents: false, vscode: false,
   },
   full: {
-    language: 'ts', target: ['library', 'cli'], moduleFormat: 'dual', bundler: 'tsup',
+    language: 'ts', target: ['library', 'cli'], moduleFormat: 'esm', bundler: 'tsup',
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
     release: 'changesets',
     workflows: ['ci', 'npm-publish', 'pages', 'codeql', 'codecov', 'stale'],
@@ -65,14 +65,14 @@ export function resolvePreset(name) {
 
 // Short gists for the CLI help and the web configurator (tooltips + description).
 export const PRESET_INFO = {
-  'ts-lib': 'TypeScript library — dual ESM/CJS, tsup, Vitest, ESLint.',
+  'ts-lib': 'TypeScript library — ESM-only, tsup, Vitest, ESLint.',
   'js-lib': 'JavaScript (ESM) library — tsup, Vitest, ESLint.',
   'ts-cli': 'TypeScript CLI + library — ESM, ships a bin.',
   cli: 'TypeScript CLI tool — ESM, ships a bin.',
   'react-lib': 'React component library (TS) — JSX, peer deps, jsdom tests.',
   'react-lib-js': 'React component library (JS) — JSX, peer deps, jsdom tests.',
   'react-app': 'React SPA — Vite dev server, build, Testing Library.',
-  'vue-lib': 'Vue component library — Vite lib build (SFCs), dual + types.',
+  'vue-lib': 'Vue component library — Vite lib build (SFCs), ESM + types.',
   'vue-app': 'Vue SPA — Vite dev server, build, Testing Library.',
   'svelte-lib': 'Svelte component library — ships source, peer svelte, jsdom tests.',
   'svelte-app': 'Svelte SPA — Vite dev server, build, Testing Library.',

@@ -21,11 +21,11 @@ var OPTIONS = {
     group: "core",
     type: "select",
     label: "Module format",
-    default: "dual",
+    default: "esm",
     choices: [
-      { value: "esm", label: "ESM only" },
-      { value: "cjs", label: "CommonJS only" },
-      { value: "dual", label: "Dual (ESM + CJS)" }
+      { value: "esm", label: "ESM only (recommended)" },
+      { value: "dual", label: "Dual (ESM + CJS)" },
+      { value: "cjs", label: "CommonJS only" }
     ]
   },
   target: {
@@ -2129,12 +2129,12 @@ ${cfg.license}${cfg.author ? " \xA9 " + cfg.author : ""}
 
 // src/core/presets.js
 var PRESETS = {
-  "ts-lib": { language: "ts", target: ["library"], moduleFormat: "dual" },
-  "js-lib": { language: "js", target: ["library"], moduleFormat: "dual", bundler: "tsup" },
+  "ts-lib": { language: "ts", target: ["library"], moduleFormat: "esm" },
+  "js-lib": { language: "js", target: ["library"], moduleFormat: "esm", bundler: "tsup" },
   "ts-cli": { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
   cli: { language: "ts", target: ["cli", "library"], moduleFormat: "esm" },
-  "react-lib": { language: "ts", framework: "react", target: ["library"], moduleFormat: "dual", test: "vitest" },
-  "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "dual", bundler: "tsup", test: "vitest" },
+  "react-lib": { language: "ts", framework: "react", target: ["library"], moduleFormat: "esm", test: "vitest" },
+  "react-lib-js": { language: "js", framework: "react", target: ["library"], moduleFormat: "esm", bundler: "tsup", test: "vitest" },
   "react-app": { language: "ts", framework: "react", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
   "vue-lib": { language: "ts", framework: "vue", target: ["library"], test: "vitest" },
   "vue-app": { language: "ts", framework: "vue", target: ["app"], test: "vitest", release: "none", workflows: ["ci"] },
@@ -2158,7 +2158,7 @@ var PRESETS = {
   oss: {
     language: "ts",
     target: ["library"],
-    moduleFormat: "dual",
+    moduleFormat: "esm",
     bundler: "tsup",
     test: "vitest",
     coverage: true,
@@ -2176,7 +2176,7 @@ var PRESETS = {
   minimal: {
     language: "ts",
     target: ["library"],
-    moduleFormat: "dual",
+    moduleFormat: "esm",
     bundler: "tsup",
     test: "none",
     lint: "none",
@@ -2191,7 +2191,7 @@ var PRESETS = {
   full: {
     language: "ts",
     target: ["library", "cli"],
-    moduleFormat: "dual",
+    moduleFormat: "esm",
     bundler: "tsup",
     test: "vitest",
     coverage: true,
@@ -2224,14 +2224,14 @@ function resolvePreset(name) {
   return void 0;
 }
 var PRESET_INFO = {
-  "ts-lib": "TypeScript library \u2014 dual ESM/CJS, tsup, Vitest, ESLint.",
+  "ts-lib": "TypeScript library \u2014 ESM-only, tsup, Vitest, ESLint.",
   "js-lib": "JavaScript (ESM) library \u2014 tsup, Vitest, ESLint.",
   "ts-cli": "TypeScript CLI + library \u2014 ESM, ships a bin.",
   cli: "TypeScript CLI tool \u2014 ESM, ships a bin.",
   "react-lib": "React component library (TS) \u2014 JSX, peer deps, jsdom tests.",
   "react-lib-js": "React component library (JS) \u2014 JSX, peer deps, jsdom tests.",
   "react-app": "React SPA \u2014 Vite dev server, build, Testing Library.",
-  "vue-lib": "Vue component library \u2014 Vite lib build (SFCs), dual + types.",
+  "vue-lib": "Vue component library \u2014 Vite lib build (SFCs), ESM + types.",
   "vue-app": "Vue SPA \u2014 Vite dev server, build, Testing Library.",
   "svelte-lib": "Svelte component library \u2014 ships source, peer svelte, jsdom tests.",
   "svelte-app": "Svelte SPA \u2014 Vite dev server, build, Testing Library.",
