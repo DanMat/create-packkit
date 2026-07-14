@@ -2159,6 +2159,7 @@ var doctor_default = {
 };
 function script(cfg) {
   return [
+    `/* global process, console, URL */`,
     `// Checks your environment matches this project. Warns only \u2014 never fails.`,
     `import { readFileSync } from 'node:fs';`,
     ``,

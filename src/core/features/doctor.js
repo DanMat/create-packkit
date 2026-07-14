@@ -17,6 +17,7 @@ export default {
 
 function script(cfg) {
   return [
+    `/* global process, console, URL */`,
     `// Checks your environment matches this project. Warns only — never fails.`,
     `import { readFileSync } from 'node:fs';`,
     ``,
