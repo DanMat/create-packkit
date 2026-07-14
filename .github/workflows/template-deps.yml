@@ -50,3 +50,13 @@ jobs:
             gh issue create --title "$TITLE" --body-file issue.md --label dependencies 2>/dev/null \
               || gh issue create --title "$TITLE" --body-file issue.md
           fi
+
+      - name: Close the issue when everything is fresh
+        if: steps.check.outputs.stale == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM=$(gh issue list --state open --search "in:title Stale template dependencies" --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$NUM" ]; then
+            gh issue close "$NUM" --comment "All bumpable template dependencies are current — closing automatically."
+          fi
