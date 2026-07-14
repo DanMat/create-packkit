@@ -159,6 +159,8 @@ function jestConfig(cfg) {
       `\ttransform: {`,
       `\t\t'^.+\\\\.ts$': ['ts-jest', { useESM: true, tsconfig: { verbatimModuleSyntax: false } }],`,
       `\t},`,
+      `\t// let \`./x.js\` imports resolve to the .ts source under ESM`,
+      `\tmoduleNameMapper: { '^(\\\\.{1,2}/.*)\\\\.js$': '$1' },`,
       `};`,
       ``,
     ].join('\n');
