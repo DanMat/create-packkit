@@ -28,7 +28,9 @@ export default {
       pkg.devDependencies.husky = '^9.1.0';
     } else if (cfg.gitHooks === 'lefthook') {
       files['lefthook.yml'] = lefthookYml(cfg, staged);
-      pkg.scripts.prepare = 'lefthook install';
+      // `|| true` so `npm install` doesn't fail before `git init` — lefthook
+      // (unlike husky/simple-git-hooks) errors hard without a .git directory.
+      pkg.scripts.prepare = 'lefthook install || true';
       pkg.devDependencies.lefthook = '^2.0.0';
     }
 

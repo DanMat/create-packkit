@@ -84,11 +84,19 @@ test('README badges reflect config (npm for libs, none for private apps)', () =>
 test('package checks + knip: scripts, deps, CI steps', () => {
   const out = generate(fromPreset('ts-lib', { name: 'c', pkgChecks: true, knip: true, workflows: ['ci'] }));
   const pkg = JSON.parse(out.files['package.json']);
-  assert.equal(pkg.scripts['check:pkg'], 'publint && attw --pack');
+  // ESM-only packages use attw's esm-only profile (no false CJS failure); dual keeps default.
+  assert.equal(pkg.scripts['check:pkg'], 'publint && attw --pack --profile esm-only');
+  const dual = generate(fromPreset('ts-lib', { name: 'c', pkgChecks: true, moduleFormat: 'dual' }));
+  assert.equal(JSON.parse(dual.files['package.json']).scripts['check:pkg'], 'publint && attw --pack');
   assert.ok(pkg.devDependencies.publint && pkg.devDependencies['@arethetypeswrong/cli'] && pkg.devDependencies.knip);
   assert.match(out.files['.github/workflows/ci.yml'], /check:pkg/);
   // pkgChecks is coerced off for non-publishable targets
   assert.equal(generate(fromPreset('react-app', { name: 'c', pkgChecks: true })).config.pkgChecks, false);
+});
+
+test('lefthook prepare tolerates a missing .git (|| true)', () => {
+  const out = generate(fromPreset('ts-cli', { name: 'h', gitHooks: 'lefthook' }));
+  assert.equal(JSON.parse(out.files['package.json']).scripts.prepare, 'lefthook install || true');
 });
 
 test('jsr: jsr.json + workflow for a plain TS library only', () => {
