@@ -209,6 +209,17 @@ test('service: hardened Dockerfile (non-root + healthcheck)', () => {
   assert.match(out.files.Dockerfile, /HEALTHCHECK/);
 });
 
+test('doctor: script for all; postinstall only for private (non-published) projects', () => {
+  const service = generate(fromPreset('node-service', { name: 'svc', doctor: true }));
+  assert.ok(service.files['scripts/doctor.mjs']);
+  const spkg = JSON.parse(service.files['package.json']);
+  assert.equal(spkg.scripts.doctor, 'node scripts/doctor.mjs');
+  assert.equal(spkg.scripts.postinstall, 'node scripts/doctor.mjs');
+  const lib = generate(fromPreset('ts-lib', { name: 'x', doctor: true }));
+  assert.ok(lib.files['scripts/doctor.mjs']);
+  assert.ok(!JSON.parse(lib.files['package.json']).scripts.postinstall);
+});
+
 test('service frameworks: fastify and express generate their own app + deps', () => {
   const fastify = generate(fromPreset('node-service', { name: 'svc', serviceFramework: 'fastify' }));
   assert.match(fastify.files['src/app.ts'], /import Fastify from 'fastify'/);

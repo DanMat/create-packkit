@@ -144,6 +144,7 @@ var OPTIONS = {
   pkgChecks: { group: "quality", type: "boolean", label: "Package checks (publint + are-the-types-wrong)", default: false },
   knip: { group: "quality", type: "boolean", label: "Knip (unused files / deps / exports)", default: false },
   sizeLimit: { group: "quality", type: "boolean", label: "size-limit (bundle-size budget, libraries)", default: false },
+  doctor: { group: "quality", type: "boolean", label: "Env doctor (warn on Node / package-manager mismatch)", default: false },
   // ---- lint / format ----
   lint: {
     group: "quality",
@@ -414,8 +415,8 @@ function libraryEntry(cfg) {
     ``
   ].join("\n");
 }
-function run(cfg, script) {
-  return cfg.packageManager === "npm" ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
+function run(cfg, script2) {
+  return cfg.packageManager === "npm" ? `npm run ${script2}` : `${cfg.packageManager} ${script2}`;
 }
 function makeBadges(cfg) {
   const badges = [];
@@ -722,7 +723,7 @@ function react(cfg, files, pkg, forApp) {
   }
 }
 function vue(cfg, files, pkg, forApp) {
-  const script = cfg.isTs ? `<script setup lang="ts">` : `<script setup>`;
+  const script2 = cfg.isTs ? `<script setup lang="ts">` : `<script setup>`;
   if (forApp) {
     files["index.html"] = htmlShell(cfg, `/src/main.${cfg.ext}`);
     files[`src/main.${cfg.ext}`] = [
@@ -732,13 +733,13 @@ function vue(cfg, files, pkg, forApp) {
       `createApp(App).mount('#root');`,
       ``
     ].join("\n");
-    files["src/App.vue"] = [script, `<\/script>`, ``, `<template>`, `	<h1>Hello from ${cfg.name}</h1>`, `</template>`, ``].join("\n");
+    files["src/App.vue"] = [script2, `<\/script>`, ``, `<template>`, `	<h1>Hello from ${cfg.name}</h1>`, `</template>`, ``].join("\n");
     pkg.dependencies = { vue: "^3.4.0" };
   } else {
     files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.vue';
 `;
     files["src/Button.vue"] = [
-      script,
+      script2,
       `defineProps${cfg.isTs ? "<{ label: string }>()" : "(['label'])"};`,
       `<\/script>`,
       ``,
@@ -752,7 +753,7 @@ function vue(cfg, files, pkg, forApp) {
   }
 }
 function svelte(cfg, files, pkg, forApp) {
-  const script = cfg.isTs ? `<script lang="ts">` : `<script>`;
+  const script2 = cfg.isTs ? `<script lang="ts">` : `<script>`;
   files["svelte.config.js"] = `import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 export default { preprocess: vitePreprocess() };
@@ -769,13 +770,13 @@ export default { preprocess: vitePreprocess() };
       `export default app;`,
       ``
     ].join("\n");
-    files["src/App.svelte"] = [script, `<\/script>`, ``, `<h1>Hello from ${cfg.name}</h1>`, ``].join("\n");
+    files["src/App.svelte"] = [script2, `<\/script>`, ``, `<h1>Hello from ${cfg.name}</h1>`, ``].join("\n");
     pkg.dependencies = { svelte: "^5.0.0" };
   } else {
     files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.svelte';
 `;
     files["src/Button.svelte"] = [
-      script,
+      script2,
       cfg.isTs ? `	interface Props { label: string; }` : ``,
       cfg.isTs ? `	const { label }: Props = $props();` : `	const { label } = $props();`,
       `<\/script>`,
@@ -1568,8 +1569,8 @@ function pmInstall(cfg) {
     bun: "bun install --frozen-lockfile"
   }[cfg.packageManager];
 }
-function pmRun(cfg, script) {
-  return cfg.packageManager === "npm" ? `npm run ${script}` : `${cfg.packageManager} ${script}`;
+function pmRun(cfg, script2) {
+  return cfg.packageManager === "npm" ? `npm run ${script2}` : `${cfg.packageManager} ${script2}`;
 }
 function pmExec(cfg, cmd) {
   return { npm: `npx ${cmd}`, pnpm: `pnpm exec ${cmd}`, yarn: `yarn ${cmd}`, bun: `bunx ${cmd}` }[cfg.packageManager];
@@ -2145,6 +2146,54 @@ var vscode_default = {
   }
 };
 
+// src/core/features/doctor.js
+var doctor_default = {
+  id: "doctor",
+  active: (cfg) => cfg.doctor && !cfg.monorepo,
+  apply(cfg) {
+    const files = { "scripts/doctor.mjs": script(cfg) };
+    const pkg = { scripts: { doctor: "node scripts/doctor.mjs" } };
+    if (!cfg.publishable) pkg.scripts.postinstall = "node scripts/doctor.mjs";
+    return { files, pkg };
+  }
+};
+function script(cfg) {
+  return [
+    `// Checks your environment matches this project. Warns only \u2014 never fails.`,
+    `import { readFileSync } from 'node:fs';`,
+    ``,
+    `const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));`,
+    `const gte = (a, b) => {`,
+    `	const pa = String(a).split('.').map(Number);`,
+    `	const pb = String(b).split('.').map(Number);`,
+    `	for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);`,
+    `	return true;`,
+    `};`,
+    ``,
+    `let issues = 0;`,
+    `const floor = (pkg.engines?.node || '').replace(/[^0-9.]/g, '');`,
+    `const node = process.versions.node;`,
+    `if (floor && !gte(node, floor)) {`,
+    "	console.warn(`\u26A0  Node ${node} is below the required >=${floor} \u2014 run: nvm install ${floor.split('.')[0]}`);",
+    `	issues++;`,
+    `} else {`,
+    "	console.log(`\u2713 Node ${node}`);",
+    `}`,
+    ``,
+    `const expectedPm = '${cfg.packageManager}';`,
+    `const usingPm = (process.env.npm_config_user_agent || '').split('/')[0];`,
+    `if (usingPm && usingPm !== expectedPm) {`,
+    "	console.warn(`\u26A0  This project uses ${expectedPm}, but you ran ${usingPm}.`);",
+    `	issues++;`,
+    `} else {`,
+    "	console.log(`\u2713 Package manager: ${expectedPm}`);",
+    `}`,
+    ``,
+    `if (issues) console.warn('\\nSee the README "Requirements" section to fix these.');`,
+    ``
+  ].join("\n");
+}
+
 // src/core/features/gitfiles.js
 var GITIGNORE = `# dependencies
 node_modules/
@@ -2223,6 +2272,7 @@ var features_default = [
   community_default,
   agents_default,
   vscode_default,
+  doctor_default,
   gitfiles_default
 ];
 

@@ -48,7 +48,7 @@ Options:
   --workflows <ci|npm-publish|pages|codeql|codecov|stale>   (repeatable)
   --deps <renovate|dependabot|none>  --license <MIT|Apache-2.0|ISC|none>
   --pkg-checks (publint + are-the-types-wrong)   --knip   --jsr   --canary
-  --size-limit (bundle-size budget, libraries)
+  --size-limit (bundle-size budget, libraries)   --doctor (env check)
   --no-coverage  --no-community  --no-agents  --no-vscode  --no-editorconfig
   --schema            Print the full option/preset schema as JSON (for tools/agents)
   -h, --help          Show this help

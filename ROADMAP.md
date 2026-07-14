@@ -44,7 +44,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [x] ~~**Import an existing `package.json`** to pre-fill the web configurator.~~ **Shipped (2.3).** Detects name/description/author/type + `bin`→cli.
 - [x] ~~**Share a config as a URL** — encode the selection in the query string.~~ **Shipped (2.3).** "Share link" button; the diff-from-defaults is encoded and restored on load.
 - [x] ~~**More service frameworks** — Fastify / Express alongside Hono.~~ **Shipped (2.4).** `--server <hono|fastify|express>`; framework-aware app/server/test.
-- [ ] **Postinstall doctor** — check the local Node / package-manager versions match `engines`, warn if not.
+- [x] ~~**Postinstall doctor** — check the local Node / package-manager versions match `engines`, warn if not.~~ **Shipped (2.5).** `--doctor`; `npm run doctor` (+ postinstall for private projects), warn-only.
 - [ ] **Vue/Svelte app scaffolds with a router** — the app targets are minimal SPAs; add vue-router / SvelteKit-style routing (plus a React Router option).
 - [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
 

@@ -22,6 +22,7 @@ import storybook from './storybook.js';
 import community from './community.js';
 import agents from './agents.js';
 import vscode from './vscode.js';
+import doctor from './doctor.js';
 import gitfiles from './gitfiles.js';
 
 export default [
@@ -46,5 +47,6 @@ export default [
   community,
   agents,
   vscode,
+  doctor,
   gitfiles,
 ];

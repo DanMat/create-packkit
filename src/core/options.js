@@ -111,6 +111,7 @@ export const OPTIONS = {
   pkgChecks: { group: 'quality', type: 'boolean', label: 'Package checks (publint + are-the-types-wrong)', default: false },
   knip: { group: 'quality', type: 'boolean', label: 'Knip (unused files / deps / exports)', default: false },
   sizeLimit: { group: 'quality', type: 'boolean', label: 'size-limit (bundle-size budget, libraries)', default: false },
+  doctor: { group: 'quality', type: 'boolean', label: 'Env doctor (warn on Node / package-manager mismatch)', default: false },
 
   // ---- lint / format ----
   lint: {

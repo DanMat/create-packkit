@@ -52,6 +52,7 @@ jobs:
           - node-service --server fastify
           - node-service --server express
           - ts-lib --size-limit
+          - node-service --doctor
     name: ${{ matrix.preset }}
     steps:
       - uses: actions/checkout@v4

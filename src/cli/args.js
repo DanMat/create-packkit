@@ -56,6 +56,7 @@ export function parseCliArgs(argv) {
       'pkg-checks': { type: 'boolean' },
       knip: { type: 'boolean' },
       'size-limit': { type: 'boolean' },
+      doctor: { type: 'boolean' },
       jsr: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -86,6 +87,7 @@ export function parseCliArgs(argv) {
   if (values['pkg-checks']) overrides.pkgChecks = true;
   if (values.knip) overrides.knip = true;
   if (values['size-limit']) overrides.sizeLimit = true;
+  if (values.doctor) overrides.doctor = true;
   if (values.jsr) overrides.jsr = true;
   for (const [flag, key] of Object.entries(NEGATABLE)) {
     if (values[flag]) overrides[key] = false;
