@@ -2,9 +2,16 @@
 
 > A highly configurable scaffolder for modern **npm packages and CLIs** — pick your stack from a CLI **or** a web configurator, and get a ready-to-ship repo.
 
-[![Configure on the web](https://img.shields.io/badge/configure-on%20the%20web-00e5ff)](https://danmat.github.io/create-packkit/)
-[![npm](https://img.shields.io/npm/v/create-packkit)](https://www.npmjs.com/package/create-packkit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/create-packkit?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/create-packkit)
+[![npm downloads](https://img.shields.io/npm/dm/create-packkit?style=flat-square&logo=npm&color=cb3837&label=downloads)](https://www.npmjs.com/package/create-packkit)
+[![CI](https://img.shields.io/github/actions/workflow/status/DanMat/create-packkit/ci.yml?style=flat-square&logo=github&label=CI&branch=main)](https://github.com/DanMat/create-packkit/actions/workflows/ci.yml)
+[![install size](https://img.shields.io/badge/install%20size-tiny-44cc11?style=flat-square)](https://packagephobia.com/result?p=create-packkit)
+[![License: MIT](https://img.shields.io/npm/l/create-packkit?style=flat-square&color=blue)](LICENSE)
+<br/>
+[![Configure on the web](https://img.shields.io/badge/⚙_configure-on_the_web-00e5ff?style=flat-square)](https://danmat.github.io/create-packkit/)
+[![MCP server](https://img.shields.io/badge/MCP-packkit--mcp-8a5cf6?style=flat-square)](mcp)
+[![llms.txt](https://img.shields.io/badge/llms.txt-✓-000000?style=flat-square)](https://danmat.github.io/create-packkit/llms.txt)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 
 Most scaffolders lock you into one stack, one language, and the terminal. Packkit lets you **choose** — TypeScript or JavaScript, library or CLI, ESM/CJS/dual, your bundler, test runner, linter, git hooks, release flow, GitHub Actions and more — and it works from a CLI **or** a browser page that downloads your project as a zip.
 
