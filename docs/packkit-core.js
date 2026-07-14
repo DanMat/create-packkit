@@ -132,6 +132,7 @@ var OPTIONS = {
   canary: { group: "release", type: "boolean", label: "Snapshot / canary release workflow (Changesets)", default: false },
   pkgChecks: { group: "quality", type: "boolean", label: "Package checks (publint + are-the-types-wrong)", default: false },
   knip: { group: "quality", type: "boolean", label: "Knip (unused files / deps / exports)", default: false },
+  sizeLimit: { group: "quality", type: "boolean", label: "size-limit (bundle-size budget, libraries)", default: false },
   // ---- lint / format ----
   lint: {
     group: "quality",
@@ -269,6 +270,7 @@ function normalizeConfig(input = {}) {
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   if (!cfg.publishable) cfg.pkgChecks = false;
   if (!cfg.publishable) cfg.sourcemaps = false;
+  if (!(cfg.publishable && cfg.hasBuild)) cfg.sizeLimit = false;
   if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
   if (cfg.release !== "changesets") cfg.canary = false;
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
@@ -1405,6 +1407,26 @@ var checks_default = {
   }
 };
 
+// src/core/features/sizelimit.js
+var sizelimit_default = {
+  id: "sizelimit",
+  active: (cfg) => cfg.sizeLimit,
+  apply(cfg) {
+    return {
+      files: {
+        ".size-limit.json": toJson([{ name: cfg.name, path: "dist/index.js", limit: "10 kB" }])
+      },
+      pkg: {
+        scripts: { size: "size-limit" },
+        devDependencies: {
+          "size-limit": "^11.0.0",
+          "@size-limit/preset-small-lib": "^11.0.0"
+        }
+      }
+    };
+  }
+};
+
 // src/core/features/jsr.js
 var jsr_default = {
   id: "jsr",
@@ -1517,6 +1539,7 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.test !== "none") jobs.push(`      - run: ${pmRun(cfg, codecov ? "coverage" : "test")}`);
   if (cfg.knip) jobs.push(`      - run: ${pmRun(cfg, "knip")}`);
   if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, "build")}`);
+  if (cfg.sizeLimit) jobs.push(`      - run: ${pmRun(cfg, "size")}`);
   if (cfg.pkgChecks) jobs.push(`      - run: ${pmRun(cfg, "check:pkg")}`);
   const cov = codecov ? "\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}" : "";
   return [
@@ -2099,6 +2122,7 @@ var features_default = [
   release_default,
   cli_default,
   checks_default,
+  sizelimit_default,
   jsr_default,
   workflows_default,
   storybook_default,

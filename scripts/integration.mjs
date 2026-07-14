@@ -54,7 +54,7 @@ if (!step(pm, ['install'], { cwd: app })) {
 }
 
 // 3) run the generated project's checks (only those it actually defines)
-for (const s of ['typecheck', 'lint', 'build', 'test', 'build-storybook']) {
+for (const s of ['typecheck', 'lint', 'build', 'size', 'test', 'build-storybook']) {
   if (!scripts[s]) continue;
   const ok = pm === 'npm' ? step('npm', ['run', s], { cwd: app }) : step(pm, [s], { cwd: app });
   if (!ok) {

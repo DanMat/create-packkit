@@ -40,7 +40,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 ## Next up (working order)
 
 - [x] ~~**E2E option — Playwright** for the app targets (config + example spec + CI job).~~ — **Shipped (2.1).** `--e2e` on any app.
-- [ ] **`size-limit`** — bundle-size budget check for libraries (config + CI).
+- [x] ~~**`size-limit`** — bundle-size budget check for libraries (config + CI).~~ **Shipped (2.3).** `--size-limit`; `.size-limit.json` + `size` script + CI gate.
 - [ ] **Import an existing `package.json`** to pre-fill the web configurator (paste/upload → detect name/description/author/type).
 - [ ] **Share a config as a URL** — encode the selection in the query string so a configured setup is linkable.
 - [ ] **More service frameworks** — Fastify / Express alongside Hono.

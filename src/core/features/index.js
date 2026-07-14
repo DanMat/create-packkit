@@ -15,6 +15,7 @@ import githooks from './githooks.js';
 import release from './release.js';
 import cli from './cli.js';
 import checks from './checks.js';
+import sizelimit from './sizelimit.js';
 import jsr from './jsr.js';
 import workflows from './workflows.js';
 import storybook from './storybook.js';
@@ -38,6 +39,7 @@ export default [
   release,
   cli,
   checks,
+  sizelimit,
   jsr,
   workflows,
   storybook,

@@ -80,6 +80,7 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.test !== 'none') jobs.push(`      - run: ${pmRun(cfg, codecov ? 'coverage' : 'test')}`);
   if (cfg.knip) jobs.push(`      - run: ${pmRun(cfg, 'knip')}`);
   if (cfg.hasBuild) jobs.push(`      - run: ${pmRun(cfg, 'build')}`);
+  if (cfg.sizeLimit) jobs.push(`      - run: ${pmRun(cfg, 'size')}`); // after build (measures dist)
   if (cfg.pkgChecks) jobs.push(`      - run: ${pmRun(cfg, 'check:pkg')}`); // after build (attw packs dist)
   const cov = codecov
     ? '\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}'

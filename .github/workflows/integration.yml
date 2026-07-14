@@ -49,6 +49,7 @@ jobs:
           - cli --hooks lefthook
           - react-app --e2e
           - node-service --env
+          - ts-lib --size-limit
     name: ${{ matrix.preset }}
     steps:
       - uses: actions/checkout@v4

@@ -102,6 +102,7 @@ export const OPTIONS = {
   canary: { group: 'release', type: 'boolean', label: 'Snapshot / canary release workflow (Changesets)', default: false },
   pkgChecks: { group: 'quality', type: 'boolean', label: 'Package checks (publint + are-the-types-wrong)', default: false },
   knip: { group: 'quality', type: 'boolean', label: 'Knip (unused files / deps / exports)', default: false },
+  sizeLimit: { group: 'quality', type: 'boolean', label: 'size-limit (bundle-size budget, libraries)', default: false },
 
   // ---- lint / format ----
   lint: {
@@ -260,6 +261,8 @@ export function normalizeConfig(input = {}) {
   if (!cfg.publishable) cfg.pkgChecks = false;
   // Sourcemaps + shipped source only matter for a published package.
   if (!cfg.publishable) cfg.sourcemaps = false;
+  // A bundle-size budget needs a published package with a built entry.
+  if (!(cfg.publishable && cfg.hasBuild)) cfg.sizeLimit = false;
   // Env validation is for server-side runtimes (services / CLIs), not libs/apps.
   if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
   // Canary snapshots ride on the Changesets flow.

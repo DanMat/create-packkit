@@ -209,6 +209,14 @@ test('service: hardened Dockerfile (non-root + healthcheck)', () => {
   assert.match(out.files.Dockerfile, /HEALTHCHECK/);
 });
 
+test('size-limit: library gets config + script; ignored for apps', () => {
+  const lib = generate(fromPreset('ts-lib', { name: 'x', sizeLimit: true }));
+  assert.ok(lib.files['.size-limit.json']);
+  assert.equal(JSON.parse(lib.files['package.json']).scripts.size, 'size-limit');
+  const app = generate(fromPreset('react-app', { name: 'a', sizeLimit: true }));
+  assert.ok(!app.files['.size-limit.json']);
+});
+
 test('canary: changesets + canary emits the workflow; gated otherwise', () => {
   const on = generate(fromPreset('oss', { name: 'lib', canary: true }));
   assert.ok(on.files['.github/workflows/canary.yml']);

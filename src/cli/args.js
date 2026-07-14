@@ -54,6 +54,7 @@ export function parseCliArgs(argv) {
       canary: { type: 'boolean' },
       'pkg-checks': { type: 'boolean' },
       knip: { type: 'boolean' },
+      'size-limit': { type: 'boolean' },
       jsr: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -83,6 +84,7 @@ export function parseCliArgs(argv) {
   if (values.canary) overrides.canary = true;
   if (values['pkg-checks']) overrides.pkgChecks = true;
   if (values.knip) overrides.knip = true;
+  if (values['size-limit']) overrides.sizeLimit = true;
   if (values.jsr) overrides.jsr = true;
   for (const [flag, key] of Object.entries(NEGATABLE)) {
     if (values[flag]) overrides[key] = false;
