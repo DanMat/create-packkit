@@ -17,13 +17,13 @@ function pmExec(cfg, cmd) {
   return { npm: `npx ${cmd}`, pnpm: `pnpm exec ${cmd}`, yarn: `yarn ${cmd}`, bun: `bunx ${cmd}` }[cfg.packageManager];
 }
 function setupSteps(cfg) {
-  const steps = ['      - uses: actions/checkout@v4'];
-  if (cfg.packageManager === 'pnpm') steps.push('      - uses: pnpm/action-setup@v4');
+  const steps = ['      - uses: actions/checkout@v7'];
+  if (cfg.packageManager === 'pnpm') steps.push('      - uses: pnpm/action-setup@v6');
   if (cfg.packageManager === 'bun') {
     steps.push('      - uses: oven-sh/setup-bun@v2');
   } else {
     steps.push(
-      '      - uses: actions/setup-node@v4',
+      '      - uses: actions/setup-node@v7',
       '        with:',
       `          node-version: '${cfg.nodeVersion}'`,
       `          cache: '${cfg.packageManager === 'yarn' ? 'yarn' : cfg.packageManager === 'pnpm' ? 'pnpm' : 'npm'}'`,
@@ -83,7 +83,7 @@ function ciWorkflow(cfg, codecov) {
   if (cfg.sizeLimit) jobs.push(`      - run: ${pmRun(cfg, 'size')}`); // after build (measures dist)
   if (cfg.pkgChecks) jobs.push(`      - run: ${pmRun(cfg, 'check:pkg')}`); // after build (attw packs dist)
   const cov = codecov
-    ? '\n      - uses: codecov/codecov-action@v4\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}'
+    ? '\n      - uses: codecov/codecov-action@v7\n        with:\n          token: ${{ secrets.CODECOV_TOKEN }}'
     : '';
   return [
     'name: CI',
@@ -155,7 +155,7 @@ function pagesWorkflow(cfg) {
   // Storybook projects deploy the built catalog; everything else serves ./docs.
   const build = cfg.storybook
     ? [setupSteps(cfg), `      - run: ${pmRun(cfg, 'build-storybook')}`, '      - uses: actions/configure-pages@v5', '      - uses: actions/upload-pages-artifact@v3', '        with:', '          path: ./storybook-static']
-    : ['      - uses: actions/checkout@v4', '      - uses: actions/configure-pages@v5', '      - uses: actions/upload-pages-artifact@v3', '        with:', '          path: ./docs'];
+    : ['      - uses: actions/checkout@v7', '      - uses: actions/configure-pages@v5', '      - uses: actions/upload-pages-artifact@v3', '        with:', '          path: ./docs'];
   return [
     `name: Deploy ${cfg.storybook ? 'Storybook' : 'Pages'}`,
     'on:',
@@ -197,7 +197,7 @@ function codeqlWorkflow() {
     '    permissions:',
     '      security-events: write',
     '    steps:',
-    '      - uses: actions/checkout@v4',
+    '      - uses: actions/checkout@v7',
     '      - uses: github/codeql-action/init@v3',
     '        with:',
     '          languages: javascript-typescript',
@@ -220,7 +220,7 @@ function e2eWorkflow(cfg) {
     setupSteps(cfg),
     '      - run: npx playwright install --with-deps chromium',
     `      - run: ${pmRun(cfg, 'test:e2e')}`,
-    '      - uses: actions/upload-artifact@v4',
+    '      - uses: actions/upload-artifact@v7',
     '        if: ${{ !cancelled() }}',
     '        with:',
     '          name: playwright-report',

@@ -18,6 +18,7 @@ const OVERRIDE_FLAGS = {
   server: 'serviceFramework',
   author: 'author',
   description: 'description',
+  keywords: 'keywords',
   repo: 'repo',
 };
 

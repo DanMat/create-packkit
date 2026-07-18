@@ -102,10 +102,15 @@ function update() {
 
 function commandFor(cfg) {
   const d = defaultConfig();
-  const parts = ['npx create-packkit', cfg.name || 'my-package'];
+  // Shell-quote values that aren't plain tokens (spaces, punctuation, etc.).
+  const q = (v) => (/^[\w.@/:-]+$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, "'\\''")}'`);
+  const parts = ['npx create-packkit', q(cfg.name || 'my-package')];
   const diff = (k) => JSON.stringify(cfg[k]) !== JSON.stringify(d[k]);
-  const flag = (k, f) => { if (diff(k)) parts.push(`--${f} ${cfg[k]}`); };
+  const flag = (k, f) => { if (diff(k) && cfg[k] !== '' && cfg[k] != null) parts.push(`--${f} ${q(cfg[k])}`); };
+  // Metadata (previously missing from the command).
+  flag('description', 'description'); flag('author', 'author'); flag('keywords', 'keywords'); flag('repo', 'repo');
   flag('language', 'language'); flag('framework', 'framework'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
+  if (cfg.target.includes('service')) flag('serviceFramework', 'server');
   flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release'); flag('deps', 'deps');
   flag('license', 'license'); flag('packageManager', 'pm'); flag('nodeVersion', 'node');
   if (diff('target')) cfg.target.forEach((t) => parts.push(`--target ${t}`));
@@ -119,6 +124,7 @@ function commandFor(cfg) {
   if (cfg.e2e) parts.push('--e2e');
   if (cfg.env) parts.push('--env');
   if (cfg.canary) parts.push('--canary');
+  if (cfg.doctor) parts.push('--doctor');
   if (cfg.publishable && cfg.sourcemaps === false) parts.push('--no-sourcemaps');
   if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
   if (cfg.monorepo) parts.push('--monorepo');

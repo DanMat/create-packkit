@@ -55,7 +55,7 @@ jobs:
           - node-service --doctor
     name: ${{ matrix.preset }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Test at the EXACT engines floor of the default generated project (not a
       # floated major, which hides sub-floor breakage — that's what let a Node
       # 20.17 failure ship). Derived from DEFAULT_NODE so it tracks upstream LTS
@@ -65,10 +65,10 @@ jobs:
           V=$(node --input-type=module -e "import('./src/core/node.js').then(m=>process.stdout.write(m.engineFloor(m.DEFAULT_NODE)))")
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Testing generated projects at Node $V (default engines floor)"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ steps.floor.outputs.version }}
           cache: npm

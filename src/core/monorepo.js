@@ -180,10 +180,10 @@ function exampleTest(importLine, assertion) {
 }
 
 function ciWorkflow(cfg, pm) {
-  const setup = ['      - uses: actions/checkout@v4'];
-  if (pm === 'pnpm') setup.push('      - uses: pnpm/action-setup@v4');
+  const setup = ['      - uses: actions/checkout@v7'];
+  if (pm === 'pnpm') setup.push('      - uses: pnpm/action-setup@v6');
   setup.push(
-    '      - uses: actions/setup-node@v4',
+    '      - uses: actions/setup-node@v7',
     '        with:',
     `          node-version: '${cfg.nodeVersion}'`,
     `          cache: '${pm === 'yarn' ? 'yarn' : pm === 'pnpm' ? 'pnpm' : 'npm'}'`,
