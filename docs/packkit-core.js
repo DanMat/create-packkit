@@ -1483,7 +1483,7 @@ var release_default = {
       pkg.devDependencies["release-it"] = "^20.0.0";
     } else if (cfg.release === "np") {
       pkg.scripts.release = "np";
-      pkg.devDependencies.np = "^11.0.0";
+      pkg.devDependencies.np = "^12.0.0";
     }
     return { files, pkg };
   }

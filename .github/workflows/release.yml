@@ -37,6 +37,22 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # packkit-mcp depends on create-packkit via a caret (^X.y.z), so it already
+      # picks up every new minor/patch at install time. It only needs re-pinning
+      # (and republishing) when the MAJOR changes — otherwise the MCP server would
+      # keep scaffolding with the previous major. Do that automatically here.
+      - name: Keep packkit-mcp linked to the current create-packkit major
+        run: |
+          NEW_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
+          CUR_MAJOR=$(node -p "(require('./mcp/package.json').dependencies['create-packkit']||'').replace(/[^0-9.]/g,'').split('.')[0]")
+          if [ "$NEW_MAJOR" != "$CUR_MAJOR" ]; then
+            echo "create-packkit major $CUR_MAJOR -> $NEW_MAJOR — re-pinning and bumping packkit-mcp"
+            npm --prefix mcp pkg set "dependencies.create-packkit=^${NEW_MAJOR}.0.0"
+            npm --prefix mcp version patch --no-git-tag-version
+          else
+            echo "create-packkit major unchanged ($CUR_MAJOR); packkit-mcp's caret already tracks the new release."
+          fi
+
       - name: Commit and tag
         run: |
           git config user.name "github-actions[bot]"
