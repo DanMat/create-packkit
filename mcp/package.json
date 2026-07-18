@@ -1,6 +1,6 @@
 {
   "name": "packkit-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Packkit — let AI agents scaffold modern npm packages, CLIs, services, and apps as a native tool.",
   "type": "module",
   "bin": {
@@ -33,6 +33,6 @@
   "homepage": "https://danmat.github.io/create-packkit/",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "create-packkit": "^1.1.0"
+    "create-packkit": "^2.7.0"
   }
 }
