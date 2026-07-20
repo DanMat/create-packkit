@@ -3,7 +3,7 @@
   "name": "io.github.danmat/packkit-mcp",
   "title": "Packkit",
   "description": "MCP server for Packkit — let AI agents scaffold modern npm packages, CLIs, services, and apps as a native tool.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": {
     "url": "https://github.com/DanMat/create-packkit",
     "source": "github",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "packkit-mcp",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
