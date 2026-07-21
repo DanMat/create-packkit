@@ -50,3 +50,29 @@ if (next !== src) {
 console.log(
   changed.length ? `Synced to ${version}: ${changed.join(', ')}` : `Already in sync at ${version}.`,
 );
+
+// packkit-mcp imports from create-packkit (`create-packkit/scaffold`), so a
+// release whose version falls outside the range mcp declares would publish an
+// MCP server that cannot install. Caught here — before anything is published —
+// rather than as a confusing resolution error at the end of the release.
+const range = pkg.dependencies?.['create-packkit'];
+const rootVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
+if (range && !satisfiesCaret(range, rootVersion)) {
+  console.error(
+    `\npackkit-mcp requires create-packkit "${range}", but this repo is at ${rootVersion}.\n` +
+      `The next release must be large enough to satisfy it (a minor bump if the floor is a new minor),\n` +
+      `or lower the range in mcp/package.json.`,
+  );
+  process.exit(1);
+}
+
+/** Minimal `^X.Y.Z` check — the only range style this repo uses. */
+function satisfiesCaret(range, version) {
+  const m = /^\^?(\d+)\.(\d+)\.(\d+)/.exec(range);
+  const v = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  if (!m || !v) return true; // unrecognised range — don't block the release
+  const [, rMaj, rMin, rPat] = m.map(Number);
+  const [, vMaj, vMin, vPat] = v.map(Number);
+  if (vMaj !== rMaj) return false;
+  return vMin > rMin || (vMin === rMin && vPat >= rPat);
+}

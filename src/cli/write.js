@@ -3,24 +3,46 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-/** Write a { path: contents } map under `targetDir`. Returns the count. */
-export async function writeProject(targetDir, files) {
+/**
+ * Write a { path: contents } map under `targetDir`.
+ * In `merge` mode an existing file is never touched — it's reported as skipped,
+ * so scaffolding into a repo that already has files can't destroy work.
+ * Returns { written, skipped } as arrays of relative paths.
+ */
+export async function writeProject(targetDir, files, { merge = false } = {}) {
+  const written = [];
+  const skipped = [];
   for (const [rel, contents] of Object.entries(files)) {
     const full = join(targetDir, rel);
+    if (merge && existsSync(full)) {
+      skipped.push(rel);
+      continue;
+    }
     await mkdir(dirname(full), { recursive: true });
     await writeFile(full, contents);
+    written.push(rel);
   }
-  return Object.keys(files).length;
+  return { written, skipped };
 }
 
-/** True if the directory doesn't exist or contains no entries. */
-export function dirIsEmptyOrMissing(dir) {
-  if (!existsSync(dir)) return true;
+// Entries that don't make a directory "occupied": VCS metadata and OS noise.
+// `git clone` of a fresh empty repo leaves .git/ behind, and treating that as
+// non-empty broke the most common flow — create the repo, clone it, scaffold in.
+const IGNORED_ENTRIES = new Set(['.git', '.DS_Store', 'Thumbs.db', '.hg', '.svn']);
+
+/** Real (non-ignorable) entries in `dir`. Empty when the dir is missing. */
+export function existingEntries(dir) {
+  if (!existsSync(dir)) return [];
   try {
-    return readdirSync(dir).length === 0;
+    return readdirSync(dir).filter((e) => !IGNORED_ENTRIES.has(e));
   } catch {
-    return false;
+    return [];
   }
+}
+
+/** True if the directory doesn't exist or holds nothing that would be clobbered. */
+export function dirIsEmptyOrMissing(dir) {
+  return existingEntries(dir).length === 0;
 }
 
 /** Run a command in `cwd` (arg array — no shell parsing). Never throws. */
@@ -43,4 +65,56 @@ export function gitInit(cwd) {
 /** Install dependencies with the chosen package manager. */
 export function installDeps(pm, cwd) {
   return run(pm, ['install'], cwd, { quiet: false });
+}
+
+/** Run a command and capture its output. Never throws. */
+function capture(cmd, args, cwd) {
+  const res = spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  return {
+    ok: res.status === 0,
+    stdout: (res.stdout || '').trim(),
+    stderr: (res.stderr || '').trim(),
+  };
+}
+
+/** True if `cmd` is on PATH. */
+export function hasCommand(cmd) {
+  return capture(process.platform === 'win32' ? 'where' : 'which', [cmd], process.cwd()).ok;
+}
+
+/** The authenticated GitHub login, or null if gh isn't installed or logged in. */
+export function githubLogin() {
+  const res = capture('gh', ['api', 'user', '-q', '.login'], process.cwd());
+  return res.ok && res.stdout ? res.stdout : null;
+}
+
+/**
+ * Create the GitHub repo and push to it, via the `gh` CLI.
+ *
+ * Deliberately shells out rather than calling the REST API: `gh` already owns
+ * the user's credentials, so Packkit never reads, prompts for, or stores a
+ * token. Returns { ok, error }.
+ */
+export function createGithubRepo({ slug, description, private: isPrivate = true, cwd }) {
+  const args = ['repo', 'create', slug, isPrivate ? '--private' : '--public',
+    '--source', '.', '--remote', 'origin', '--push'];
+  if (description) args.push('--description', description);
+  const res = capture('gh', args, cwd);
+  return { ok: res.ok, error: res.stderr || res.stdout };
+}
+
+/** Point `origin` at an existing remote URL and push the current branch. */
+export function pushToRemote(url, cwd) {
+  const added = capture('git', ['remote', 'add', 'origin', url], cwd);
+  if (!added.ok) return { ok: false, error: added.stderr };
+  const branch = capture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], cwd);
+  const res = capture('git', ['push', '-u', 'origin', branch.ok ? branch.stdout : 'main'], cwd);
+  return { ok: res.ok, error: res.stderr };
+}
+
+/** Stage and commit everything if the tree is dirty. No-op on a clean tree. */
+export function commitAll(cwd, message) {
+  if (!capture('git', ['status', '--porcelain'], cwd).stdout) return false;
+  run('git', ['add', '-A'], cwd);
+  return run('git', ['commit', '-m', message, '--quiet'], cwd);
 }

@@ -43,6 +43,10 @@ export function parseCliArgs(argv) {
       yes: { type: 'boolean', short: 'y' },
       recommended: { type: 'boolean' },
       here: { type: 'boolean' },
+      merge: { type: 'boolean' },
+      github: { type: 'boolean' },
+      'git-remote': { type: 'string' },
+      public: { type: 'boolean' },
       'no-install': { type: 'boolean' },
       'no-git': { type: 'boolean' },
       minify: { type: 'boolean' },
@@ -104,6 +108,12 @@ export function parseCliArgs(argv) {
     from: values.from,
     name,
     here: !!values.here,
+    merge: !!values.merge,
+    github: !!values.github,
+    gitRemote: values['git-remote'] || null,
+    // Publishing code outward is opt-in, and private is the safe default — a
+    // wrong guess here leaks source, so --public must be asked for explicitly.
+    private: !values.public,
     yes: !!values.yes || !!values.recommended,
     hasConfigFlags,
     install: !values['no-install'],

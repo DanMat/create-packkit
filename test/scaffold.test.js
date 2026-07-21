@@ -1,0 +1,57 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { writeProject, existingEntries, dirIsEmptyOrMissing } from '../src/cli/write.js';
+
+const tmp = () => mkdtemp(join(tmpdir(), 'packkit-'));
+
+test('a directory holding only .git counts as empty', async () => {
+  // The create-repo → clone → scaffold flow leaves a bare .git behind, and
+  // treating that as "not empty" used to abort the most common way in.
+  const dir = await tmp();
+  await mkdir(join(dir, '.git'));
+  await writeFile(join(dir, '.DS_Store'), '');
+  assert.deepEqual(existingEntries(dir), []);
+  assert.equal(dirIsEmptyOrMissing(dir), true);
+});
+
+test('real files make a directory non-empty', async () => {
+  const dir = await tmp();
+  await mkdir(join(dir, '.git'));
+  await writeFile(join(dir, 'README.md'), 'mine');
+  assert.deepEqual(existingEntries(dir), ['README.md']);
+  assert.equal(dirIsEmptyOrMissing(dir), false);
+});
+
+test('missing directory is empty', async () => {
+  assert.equal(dirIsEmptyOrMissing(join(await tmp(), 'nope')), true);
+});
+
+test('merge never overwrites, and reports what it kept', async () => {
+  const dir = await tmp();
+  await writeFile(join(dir, 'README.md'), 'ORIGINAL');
+  await mkdir(join(dir, 'src'));
+  await writeFile(join(dir, 'src/index.ts'), 'export const mine = 1;');
+
+  const { written, skipped } = await writeProject(
+    dir,
+    { 'README.md': 'generated', 'src/index.ts': 'generated', 'tsconfig.json': '{}' },
+    { merge: true },
+  );
+
+  assert.deepEqual(skipped.sort(), ['README.md', 'src/index.ts']);
+  assert.deepEqual(written, ['tsconfig.json']);
+  assert.equal(await readFile(join(dir, 'README.md'), 'utf8'), 'ORIGINAL');
+  assert.equal(await readFile(join(dir, 'src/index.ts'), 'utf8'), 'export const mine = 1;');
+  assert.equal(await readFile(join(dir, 'tsconfig.json'), 'utf8'), '{}');
+});
+
+test('without merge every file is written, nested dirs created', async () => {
+  const dir = await tmp();
+  const { written, skipped } = await writeProject(dir, { 'a/b/c.txt': 'hi', 'd.txt': 'yo' });
+  assert.deepEqual(skipped, []);
+  assert.equal(written.length, 2);
+  assert.equal(await readFile(join(dir, 'a/b/c.txt'), 'utf8'), 'hi');
+});

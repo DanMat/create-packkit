@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/core/index.js",
     "./core": "./src/core/index.js",
-    "./cli": "./src/cli/index.js"
+    "./cli": "./src/cli/index.js",
+    "./scaffold": "./src/cli/write.js"
   },
   "files": [
     "bin",
