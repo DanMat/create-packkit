@@ -41,7 +41,7 @@ defaults in one shot. Every option is documented (with why-you'd-use-it) at:
 
 Presets:
   ${PRESET_NAMES.join('  ')}
-  shortcuts: lib jslib rlib rapp vlib vapp slib sapp svc
+  shortcuts: lib jslib rlib rapp vlib vapp slib sapp svc fs
 
 Getting started:
   --preset <name>      Start from a preset (skips the wizard)
@@ -66,6 +66,7 @@ Stack:
   --server <hono|fastify|express>         HTTP service framework
   --pm <npm|pnpm|yarn|bun>
   --monorepo                              pnpm + Turborepo workspace
+  --monorepo-layout <libraries|fullstack> Linked packages, or web+server+shared
 
 Build & test:
   --bundler <tsup|tsdown|unbuild|rollup|none>
@@ -103,6 +104,7 @@ Examples:
   npx packkit ts-lib my-lib -y
   npx packkit react-app my-app --e2e
   npx packkit node-service api --server fastify --env
+  npx packkit fullstack acme --github        # web + API + shared, repo created
   npm create packkit@latest my-pkg -- --preset oss --pm pnpm
 `;
 
@@ -135,6 +137,9 @@ export async function run(argv = process.argv.slice(2)) {
 
   config.gitInit = args.git;
   config.install = args.install;
+  // Core is version-agnostic (it also runs in the browser), so the surface
+  // that knows the version supplies it for packkit.json.
+  config.generatorVersion = pkgVersion();
 
   // Node preflight: the generated project's tools (eslint, vite, vitest) hard-
   // require this floor. npm only *warns* on engines, so catch it here — clearly,

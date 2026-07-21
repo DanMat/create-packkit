@@ -71,6 +71,17 @@ var OPTIONS = {
     label: "Monorepo (pnpm/Turborepo workspace)",
     default: false
   },
+  monorepoLayout: {
+    group: "core",
+    type: "select",
+    label: "Monorepo layout",
+    default: "libraries",
+    when: (cfg) => cfg.monorepo,
+    choices: [
+      { value: "libraries", label: "Libraries \u2014 linked packages you publish" },
+      { value: "fullstack", label: "Full-stack app \u2014 web + server + shared" }
+    ]
+  },
   framework: {
     group: "core",
     type: "select",
@@ -250,6 +261,7 @@ var OPTION_HELP = {
   moduleFormat: "How the package is consumed. ESM-only (default) is the modern, leanest choice \u2014 Node 20.19+/22.12+ can `require()` ESM. Pick dual only if you must support older CJS-only consumers; cjs-only is rarely needed.",
   target: "What you are building \u2014 mix and match: a library (importable package), a CLI (ships a bin), an HTTP service, or an app (Vite SPA).",
   serviceFramework: "For the service target: Hono (fast, web-standard, tiny \u2014 default), Fastify (batteries-included, plugins, schema validation), or Express (ubiquitous, huge ecosystem).",
+  monorepoLayout: 'What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono) + packages/shared, wired together, with the server serving the web build in production.',
   monorepo: "Generate a pnpm + Turborepo workspace with two linked example packages and Changesets. Only worth it when \u22652 packages share code.",
   framework: "UI framework for component libraries and apps: React, Vue, or Svelte (or none for a plain package).",
   packageManager: "Which package manager the scripts, lockfile, and CI target: npm, pnpm, yarn, or bun.",
@@ -2335,8 +2347,27 @@ var features_default = [
   gitfiles_default
 ];
 
+// src/core/provenance.js
+var TRANSIENT = /* @__PURE__ */ new Set(["gitInit", "install", "generatorVersion", "preset", "name"]);
+function provenance(cfg) {
+  const defaults = defaultConfig();
+  const settings = {};
+  for (const [key, value] of Object.entries(cfg)) {
+    if (!(key in defaults) || TRANSIENT.has(key)) continue;
+    if (JSON.stringify(value) !== JSON.stringify(defaults[key])) settings[key] = value;
+  }
+  return toJson({
+    $schema: "https://danmat.github.io/create-packkit/packkit.schema.json",
+    generator: "create-packkit",
+    ...cfg.generatorVersion ? { version: cfg.generatorVersion } : {},
+    ...cfg.preset ? { preset: cfg.preset } : {},
+    settings
+  });
+}
+
 // src/core/monorepo.js
 function buildMonorepo(cfg) {
+  if (cfg.monorepoLayout === "fullstack") return buildFullstack(cfg);
   const files = {};
   const pm = cfg.packageManager;
   const scope = cfg.name.replace(/^@/, "").split("/")[0];
@@ -2423,6 +2454,7 @@ function buildMonorepo(cfg) {
   ].join("\n");
   files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
   files["README.md"] = rootReadme(cfg, pm, core, utils);
+  files["packkit.json"] = provenance(cfg);
   files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, pm);
   addPackage(files, {
     name: core,
@@ -2464,6 +2496,340 @@ function buildMonorepo(cfg) {
       workflows: ["ci"]
     }
   };
+}
+function buildFullstack(cfg) {
+  const files = {};
+  const pm = cfg.packageManager;
+  const scope = cfg.name.replace(/^@/, "").split("/")[0];
+  const shared = `@${scope}/shared`;
+  const wsProto = pm === "pnpm" ? "workspace:*" : "*";
+  const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
+  for (const feat of [community_default, agents_default, gitfiles_default]) {
+    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
+  }
+  files["package.json"] = toJson({
+    name: cfg.name,
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    ...cfg.license !== "none" ? { license: cfg.license } : {},
+    ...pm === "pnpm" ? { packageManager: "pnpm@9.10.0" } : { workspaces: ["apps/*", "packages/*"] },
+    scripts: {
+      dev: "turbo dev",
+      build: "turbo build",
+      // Production runs the built server, which also serves the web build.
+      start: `${pm === "npm" ? "npm --prefix apps/server run" : `${pm} --filter ./apps/server`} start`,
+      test: "turbo test",
+      lint: "turbo lint",
+      typecheck: "turbo typecheck"
+    },
+    devDependencies: {
+      turbo: "^2.0.0",
+      typescript: "^5.9.3",
+      vitest: "^4.0.0",
+      eslint: "^10.0.0",
+      "@eslint/js": "^10.0.0",
+      "typescript-eslint": "^8.0.0",
+      prettier: "^3.3.0",
+      "@types/node": `^${cfg.nodeVersion}.0.0`
+    }
+  });
+  if (pm === "pnpm") {
+    files["pnpm-workspace.yaml"] = 'packages:\n  - "apps/*"\n  - "packages/*"\n';
+  }
+  files["turbo.json"] = toJson({
+    $schema: "https://turbo.build/schema.json",
+    tasks: {
+      build: { dependsOn: ["^build"], outputs: ["dist/**"] },
+      // Shared is built before the apps start, so both sides always import a
+      // current copy without a separate watch process.
+      dev: { dependsOn: ["^build"], cache: false, persistent: true },
+      test: { dependsOn: ["^build"] },
+      typecheck: { dependsOn: ["^build"] },
+      lint: {}
+    }
+  });
+  files["tsconfig.base.json"] = toJson({
+    $schema: "https://json.schemastore.org/tsconfig",
+    compilerOptions: {
+      target: "ES2022",
+      module: "ESNext",
+      moduleResolution: "Bundler",
+      lib: ["ES2022", "DOM"],
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      declaration: true,
+      noEmit: true
+    }
+  });
+  files["eslint.config.js"] = [
+    `import js from '@eslint/js';`,
+    `import tseslint from 'typescript-eslint';`,
+    ``,
+    `export default tseslint.config(`,
+    `	js.configs.recommended,`,
+    `	...tseslint.configs.recommended,`,
+    `	{ ignores: ['**/dist'] },`,
+    `);`,
+    ``
+  ].join("\n");
+  files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
+  files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, pm);
+  files["README.md"] = fullstackReadme(cfg, pm, shared);
+  files["packkit.json"] = provenance(cfg);
+  files["packages/shared/package.json"] = toJson({
+    name: shared,
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    main: "./dist/index.js",
+    types: "./dist/index.d.ts",
+    exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" } },
+    scripts: {
+      build: "tsup src/index.ts --format esm --dts --clean",
+      test: "vitest run",
+      typecheck: "tsc --noEmit",
+      lint: "eslint ."
+    },
+    devDependencies: { tsup: "^8.0.0" }
+  });
+  files["packages/shared/tsconfig.json"] = toJson({ extends: "../../tsconfig.base.json", include: ["src"] });
+  files["packages/shared/src/index.ts"] = [
+    `/** The shape the server returns and the web app renders. Change it once. */`,
+    `export interface Health {`,
+    `	ok: boolean;`,
+    `	service: string;`,
+    `	uptime: number;`,
+    `}`,
+    ``,
+    `export function describeHealth(h: Health): string {`,
+    `	return h.ok ? \`\${h.service} is up (\${Math.round(h.uptime)}s)\` : \`\${h.service} is down\`;`,
+    `}`,
+    ``
+  ].join("\n");
+  files["packages/shared/src/index.test.ts"] = exampleTest2(
+    `import { describeHealth } from './index.js';`,
+    `expect(describeHealth({ ok: true, service: 'api', uptime: 12 })).toBe('api is up (12s)')`
+  );
+  files["apps/server/package.json"] = toJson({
+    name: `@${scope}/server`,
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    scripts: {
+      dev: "tsx watch src/index.ts",
+      build: "tsup src/index.ts --format esm --clean",
+      start: "node dist/index.js",
+      test: "vitest run",
+      typecheck: "tsc --noEmit",
+      lint: "eslint ."
+    },
+    dependencies: { hono: "^4.5.0", "@hono/node-server": "^2.0.0", [shared]: wsProto },
+    devDependencies: { tsx: "^4.0.0", tsup: "^8.0.0" }
+  });
+  files["apps/server/tsconfig.json"] = toJson({ extends: "../../tsconfig.base.json", include: ["src"] });
+  files["apps/server/src/app.ts"] = [
+    `import { Hono } from 'hono';`,
+    `import { serveStatic } from '@hono/node-server/serve-static';`,
+    `import type { Health } from '${shared}';`,
+    ``,
+    `export const app = new Hono();`,
+    ``,
+    `app.get('/api/health', (c) => {`,
+    `	const body: Health = { ok: true, service: '${cfg.name}', uptime: process.uptime() };`,
+    `	return c.json(body);`,
+    `});`,
+    ``,
+    `// In production the API also serves the built web app, so one process and`,
+    `// one port covers the whole thing. In dev, Vite serves the app and proxies`,
+    `// /api here instead (see apps/web/vite.config.ts).`,
+    `if (process.env.NODE_ENV === 'production') {`,
+    `	app.use('/*', serveStatic({ root: '../web/dist' }));`,
+    `}`,
+    ``
+  ].join("\n");
+  files["apps/server/src/index.ts"] = [
+    `import { serve } from '@hono/node-server';`,
+    `import { app } from './app.js';`,
+    ``,
+    `const port = Number(process.env.PORT ?? 3000);`,
+    `serve({ fetch: app.fetch, port });`,
+    `console.log(\`Listening on http://localhost:\${port}\`);`,
+    ``
+  ].join("\n");
+  files["apps/server/src/app.test.ts"] = [
+    `import { describe, it, expect } from 'vitest';`,
+    `import { app } from './app.js';`,
+    ``,
+    `describe('api', () => {`,
+    `	it('reports health', async () => {`,
+    `		const res = await app.request('/api/health');`,
+    `		expect(res.status).toBe(200);`,
+    `		expect(await res.json()).toMatchObject({ ok: true });`,
+    `	});`,
+    `});`,
+    ``
+  ].join("\n");
+  files["apps/web/package.json"] = toJson({
+    name: `@${scope}/web`,
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    scripts: {
+      dev: "vite",
+      build: "vite build",
+      preview: "vite preview",
+      test: "vitest run",
+      typecheck: "tsc --noEmit",
+      lint: "eslint ."
+    },
+    dependencies: { react: "^19.0.0", "react-dom": "^19.0.0", [shared]: wsProto },
+    devDependencies: {
+      vite: "^8.0.0",
+      "@vitejs/plugin-react": "^6.0.0",
+      // Without the React types, `turbo typecheck` fails on the very first run
+      // with TS7016/TS7026 on every JSX element.
+      "@types/react": "^19.0.0",
+      "@types/react-dom": "^19.0.0",
+      "@testing-library/react": "^16.0.0",
+      "@testing-library/dom": "^10.0.0",
+      jsdom: "^29.0.0"
+    }
+  });
+  files["apps/web/tsconfig.json"] = toJson({
+    extends: "../../tsconfig.base.json",
+    compilerOptions: { jsx: "react-jsx" },
+    include: ["src"]
+  });
+  files["apps/web/vite.config.ts"] = [
+    `/// <reference types="vitest" />`,
+    `import { defineConfig } from 'vite';`,
+    `import react from '@vitejs/plugin-react';`,
+    ``,
+    `export default defineConfig({`,
+    `	plugins: [react()],`,
+    `	// Same-origin /api in dev as in production, so no CORS and no base URL`,
+    `	// juggling between environments.`,
+    `	server: { proxy: { '/api': 'http://localhost:3000' } },`,
+    `	test: { environment: 'jsdom' },`,
+    `});`,
+    ``
+  ].join("\n");
+  files["apps/web/src/App.test.tsx"] = [
+    `import { describe, it, expect } from 'vitest';`,
+    `import { render, screen } from '@testing-library/react';`,
+    `import { App } from './App.js';`,
+    ``,
+    `describe('App', () => {`,
+    `	it('renders the service name', () => {`,
+    `		render(<App />);`,
+    `		expect(screen.getByRole('heading', { name: '${cfg.name}' })).toBeDefined();`,
+    `	});`,
+    `});`,
+    ``
+  ].join("\n");
+  files["apps/web/index.html"] = [
+    `<!doctype html>`,
+    `<html lang="en">`,
+    `	<head>`,
+    `		<meta charset="UTF-8" />`,
+    `		<meta name="viewport" content="width=device-width, initial-scale=1.0" />`,
+    `		<title>${cfg.name}</title>`,
+    `	</head>`,
+    `	<body>`,
+    `		<div id="root"></div>`,
+    `		<script type="module" src="/src/main.tsx"><\/script>`,
+    `	</body>`,
+    `</html>`,
+    ``
+  ].join("\n");
+  files["apps/web/src/main.tsx"] = [
+    `import { StrictMode } from 'react';`,
+    `import { createRoot } from 'react-dom/client';`,
+    `import { App } from './App.js';`,
+    ``,
+    `createRoot(document.getElementById('root')!).render(`,
+    `	<StrictMode>`,
+    `		<App />`,
+    `	</StrictMode>,`,
+    `);`,
+    ``
+  ].join("\n");
+  files["apps/web/src/App.tsx"] = [
+    `import { useEffect, useState } from 'react';`,
+    `import { describeHealth, type Health } from '${shared}';`,
+    ``,
+    `export function App() {`,
+    `	const [health, setHealth] = useState<Health | null>(null);`,
+    ``,
+    `	useEffect(() => {`,
+    `		fetch('/api/health')`,
+    `			.then((r) => r.json() as Promise<Health>)`,
+    `			.then(setHealth)`,
+    `			.catch(() => setHealth({ ok: false, service: '${cfg.name}', uptime: 0 }));`,
+    `	}, []);`,
+    ``,
+    `	return (`,
+    `		<main>`,
+    `			<h1>${cfg.name}</h1>`,
+    `			<p>{health ? describeHealth(health) : 'Checking\u2026'}</p>`,
+    `		</main>`,
+    `	);`,
+    `}`,
+    ``
+  ].join("\n");
+  return {
+    config: cfg,
+    files,
+    postCommands: cfg.gitInit ? ["git init", "git add -A", 'git commit -m "Initial commit from Packkit"'] : [],
+    summary: {
+      name: cfg.name,
+      fileCount: Object.keys(files).length,
+      stack: ["monorepo", "full-stack", `${pm}+turbo`, "React+Vite", "Hono", "TypeScript", "vitest"],
+      workflows: ["ci"]
+    }
+  };
+}
+function fullstackReadme(cfg, pm, shared) {
+  const install = pm === "npm" ? "npm install" : `${pm} install`;
+  const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
+  return [
+    `# ${cfg.name}`,
+    "",
+    cfg.description || "_A full-stack monorepo scaffolded with [Packkit](https://danmat.github.io/create-packkit/)._",
+    "",
+    "## Layout",
+    "",
+    "```",
+    "apps/web       React + Vite front end",
+    "apps/server    Hono API (also serves the web build in production)",
+    "packages/shared  types and helpers both sides import",
+    "```",
+    "",
+    "## Develop",
+    "",
+    "```sh",
+    install,
+    run2("dev") + "     # web on :5173, api on :3000",
+    "```",
+    "",
+    `Vite proxies \`/api\` to the server, so requests are same-origin in development exactly as they are in production \u2014 no CORS, no environment-specific base URL.`,
+    "",
+    "## Production",
+    "",
+    "```sh",
+    run2("build"),
+    run2("start") + "   # one process serving the API and the built web app",
+    "```",
+    "",
+    `\`${shared}\` is built before either app starts, so a change to a shared type surfaces as a type error on both sides rather than at runtime.`,
+    "",
+    cfg.license !== "none" ? `## License
+
+${cfg.license}${cfg.author ? " \xA9 " + cfg.author : ""}
+` : ""
+  ].join("\n");
 }
 function addPackage(files, { name, dir, src, test, deps: deps2 }) {
   const pkg = {
@@ -2577,6 +2943,16 @@ var PRESETS = {
     vscode: true
   },
   monorepo: { monorepo: true, language: "ts", packageManager: "pnpm" },
+  fullstack: {
+    monorepo: true,
+    monorepoLayout: "fullstack",
+    language: "ts",
+    packageManager: "pnpm",
+    framework: "react",
+    test: "vitest",
+    release: "none",
+    workflows: ["ci"]
+  },
   oss: {
     language: "ts",
     target: ["library"],
@@ -2638,6 +3014,8 @@ var PRESET_ALIASES = {
   slib: "svelte-lib",
   sapp: "svelte-app",
   svc: "node-service",
+  fs: "fullstack",
+  app: "fullstack",
   service: "node-service"
 };
 function resolvePreset(name) {
@@ -2659,6 +3037,7 @@ var PRESET_INFO = {
   "svelte-app": "Svelte SPA \u2014 Vite dev server, build, Testing Library.",
   "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
   monorepo: "pnpm + Turborepo workspace \u2014 two example packages, Changesets, CI.",
+  fullstack: "Full-stack monorepo \u2014 React+Vite web, Hono API, shared package; server serves the web build in production.",
   oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
   minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",
   full: "Everything on \u2014 library + CLI, all workflows and extras."
@@ -2668,7 +3047,9 @@ var PRESET_INFO = {
 function fromPreset(name, overrides = {}) {
   const canonical = resolvePreset(name);
   if (!canonical) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(", ")}`);
-  return normalizeConfig({ ...PRESETS[canonical], ...overrides });
+  const cfg = normalizeConfig({ ...PRESETS[canonical], ...overrides });
+  cfg.preset = canonical;
+  return cfg;
 }
 function generate(input) {
   const cfg = normalizeConfig(input);
@@ -2684,6 +3065,7 @@ function generate(input) {
     if (out.pkg) pkg = deepMerge(pkg, out.pkg);
   }
   files["package.json"] = toJson(finalizePackageJson(pkg));
+  files["packkit.json"] = provenance(cfg);
   return {
     config: cfg,
     files,

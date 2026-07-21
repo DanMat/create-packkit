@@ -19,6 +19,10 @@ export const PRESETS = {
     release: 'none', workflows: ['ci'], deps: 'renovate', agents: true, vscode: true,
   },
   monorepo: { monorepo: true, language: 'ts', packageManager: 'pnpm' },
+  fullstack: {
+    monorepo: true, monorepoLayout: 'fullstack', language: 'ts', packageManager: 'pnpm',
+    framework: 'react', test: 'vitest', release: 'none', workflows: ['ci'],
+  },
   oss: {
     language: 'ts', target: ['library'], moduleFormat: 'esm', bundler: 'tsup',
     test: 'vitest', coverage: true, lint: 'eslint-prettier', gitHooks: 'simple-git-hooks',
@@ -53,6 +57,8 @@ export const PRESET_ALIASES = {
   slib: 'svelte-lib',
   sapp: 'svelte-app',
   svc: 'node-service',
+  fs: 'fullstack',
+  app: 'fullstack',
   service: 'node-service',
 };
 
@@ -78,6 +84,7 @@ export const PRESET_INFO = {
   'svelte-app': 'Svelte SPA — Vite dev server, build, Testing Library.',
   'node-service': 'Node HTTP service (Hono) — tsx dev, tsup build, Dockerfile.',
   monorepo: 'pnpm + Turborepo workspace — two example packages, Changesets, CI.',
+  fullstack: 'Full-stack monorepo — React+Vite web, Hono API, shared package; server serves the web build in production.',
   oss: 'Full open-source library — coverage, CodeQL, Codecov, Renovate, Changesets.',
   minimal: 'Bare TS library — tsup only, no tests/lint/CI.',
   full: 'Everything on — library + CLI, all workflows and extras.',

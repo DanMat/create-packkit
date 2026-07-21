@@ -7,6 +7,7 @@ import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
 import { buildMonorepo } from './monorepo.js';
+import { provenance } from './provenance.js';
 import { PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset } from './presets.js';
 
 export { OPTIONS, GROUPS, OPTION_HELP, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
@@ -15,7 +16,10 @@ export { OPTIONS, GROUPS, OPTION_HELP, defaultConfig, normalizeConfig, PRESETS, 
 export function fromPreset(name, overrides = {}) {
   const canonical = resolvePreset(name);
   if (!canonical) throw new Error(`Unknown preset "${name}". Known: ${PRESET_NAMES.join(', ')}`);
-  return normalizeConfig({ ...PRESETS[canonical], ...overrides });
+  const cfg = normalizeConfig({ ...PRESETS[canonical], ...overrides });
+  // Recorded in packkit.json so a project knows which preset it came from.
+  cfg.preset = canonical;
+  return cfg;
 }
 
 /** Turn a config into a complete set of files. */
@@ -36,6 +40,7 @@ export function generate(input) {
   }
 
   files['package.json'] = toJson(finalizePackageJson(pkg));
+  files['packkit.json'] = provenance(cfg);
 
   return {
     config: cfg,

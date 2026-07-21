@@ -309,3 +309,65 @@ test('every generated package.json parses', () => {
     assert.doesNotThrow(() => JSON.parse(out.files['package.json']), preset);
   }
 });
+
+test('fullstack: web + server + shared, wired as a workspace', () => {
+  const out = generate(fromPreset('fullstack', { name: 'acme' }));
+  const root = JSON.parse(out.files['package.json']);
+  const web = JSON.parse(out.files['apps/web/package.json']);
+  const server = JSON.parse(out.files['apps/server/package.json']);
+  const shared = JSON.parse(out.files['packages/shared/package.json']);
+
+  assert.equal(out.files['pnpm-workspace.yaml'], 'packages:\n  - "apps/*"\n  - "packages/*"\n');
+  assert.equal(root.private, true, 'an app monorepo publishes nothing');
+
+  // Both sides depend on shared, which is what makes this a composition rather
+  // than three projects in one folder.
+  assert.ok(web.dependencies['@acme/shared']);
+  assert.ok(server.dependencies['@acme/shared']);
+  assert.equal(shared.private, true);
+
+  // The React types are what `turbo typecheck` fails without.
+  assert.ok(web.devDependencies['@types/react'], '@types/react');
+  assert.ok(web.devDependencies['@types/react-dom'], '@types/react-dom');
+  // A test script with no test files makes vitest exit 1.
+  assert.ok(out.files['apps/web/src/App.test.tsx'], 'web has a test');
+  assert.match(out.files['apps/web/vite.config.ts'], /environment: 'jsdom'/);
+
+  // Same-origin /api in dev and prod.
+  assert.match(out.files['apps/web/vite.config.ts'], /'\/api': 'http:\/\/localhost:3000'/);
+  assert.match(out.files['apps/server/src/app.ts'], /serveStatic\(\{ root: '\.\.\/web\/dist' \}\)/);
+});
+
+test('fullstack: shared is built before the apps start, so dev has current types', () => {
+  const out = generate(fromPreset('fullstack', { name: 'acme' }));
+  const turbo = JSON.parse(out.files['turbo.json']);
+  assert.deepEqual(turbo.tasks.dev.dependsOn, ['^build']);
+  assert.equal(turbo.tasks.dev.persistent, true);
+});
+
+test('monorepo default layout is still the library one', () => {
+  const out = generate(fromPreset('monorepo', { name: 'libs' }));
+  assert.ok(out.files['packages/core/package.json']);
+  assert.equal(out.files['apps/web/package.json'], undefined);
+});
+
+test('packkit.json records only what differs from the defaults', () => {
+  const out = generate(fromPreset('node-service', { name: 'svc', generatorVersion: '9.9.9' }));
+  const prov = JSON.parse(out.files['packkit.json']);
+  assert.equal(prov.generator, 'create-packkit');
+  assert.equal(prov.version, '9.9.9');
+  assert.equal(prov.preset, 'node-service');
+  // Derived helpers and per-run choices aren't inputs, so they'd be misleading.
+  for (const k of ['isTs', 'hasApp', 'ext', 'gitInit', 'install', 'name']) {
+    assert.equal(prov.settings[k], undefined, `${k} should not be recorded`);
+  }
+  assert.ok(Object.keys(prov.settings).length > 0, 'a preset differs from defaults');
+});
+
+test('packkit.json is deterministic — same config, same bytes', () => {
+  const cfg = { name: 'x', generatorVersion: '1.0.0' };
+  assert.equal(
+    generate(fromPreset('ts-lib', cfg)).files['packkit.json'],
+    generate(fromPreset('ts-lib', cfg)).files['packkit.json'],
+  );
+});
