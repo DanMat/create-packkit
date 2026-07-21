@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeProject, existingEntries, dirIsEmptyOrMissing, writeLockfile } from '../src/cli/write.js';
+import { generate, fromPreset } from '../src/core/index.js';
 
 const tmp = () => mkdtemp(join(tmpdir(), 'packkit-'));
 
@@ -60,4 +61,17 @@ test('without merge every file is written, nested dirs created', async () => {
   assert.deepEqual(skipped, []);
   assert.equal(written.length, 2);
   assert.equal(await readFile(join(dir, 'a/b/c.txt'), 'utf8'), 'hi');
+});
+
+test('README documents the npm credential requirement when a publish workflow is included', () => {
+  const out = generate(fromPreset('ts-lib', { name: 'r1' }));
+  const readme = out.files['README.md'];
+  assert.match(readme, /## Releasing/);
+  assert.match(readme, /Trusted Publishing/);
+  assert.match(readme, /ENEEDAUTH/, 'names the exact error the user will see');
+});
+
+test('README omits the releasing section when nothing publishes', () => {
+  const out = generate(fromPreset('react-app', { name: 'r2' }));
+  assert.doesNotMatch(out.files['README.md'], /## Releasing/);
 });

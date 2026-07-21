@@ -144,6 +144,31 @@ function readme(cfg) {
     lines.push('## CLI', '', '```sh', `npx ${cfg.name} --help`, '```', '');
   }
 
+  // Publishing needs a credential the repo doesn't have yet. The changesets
+  // workflow runs on every push, so without this note the first thing a new
+  // repo does is fail a job for a reason that's only explained in a YAML
+  // comment. Say it where someone will actually read it.
+  if (cfg.workflows?.includes('npm-publish')) {
+    const changesets = cfg.release === 'changesets';
+    lines.push(
+      '## Releasing',
+      '',
+      changesets
+        ? 'Releases are handled by the `Release` workflow: push a changeset (`npx changeset`) and it opens a version PR, then publishes when that PR merges.'
+        : 'Pushing a `v*` tag triggers the `Publish` workflow, which publishes to npm with provenance.',
+      '',
+      '**Publishing needs npm credentials, which a new repository does not have.** Either:',
+      '',
+      '- Set up [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no secret to store or rotate, and the recommended option; or',
+      '- Add an [npm automation token](https://docs.npmjs.com/creating-and-viewing-access-tokens) as an `NPM_TOKEN` repository secret.',
+      '',
+      changesets
+        ? 'Until one of those is in place the `Release` workflow will fail with `ENEEDAUTH` on every push. That is expected on a brand-new repo.'
+        : 'Until one of those is in place, tag pushes will fail with `ENEEDAUTH`.',
+      '',
+    );
+  }
+
   lines.push('## License', '', cfg.license === 'none' ? 'Unlicensed.' : `${cfg.license}${cfg.author ? ' © ' + cfg.author : ''}`, '');
   return lines.join('\n');
 }
