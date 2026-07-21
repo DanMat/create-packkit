@@ -7,9 +7,9 @@ because several of these steps fail in non-obvious ways (see [Gotchas](#gotchas)
 
 | Surface | Identifier | Updated by |
 | --- | --- | --- |
-| **npm** | `packkit-mcp` | `release.yml` (automatic) or `npm publish` |
-| **Official MCP registry** | `io.github.DanMat/packkit-mcp` | `mcp-publisher publish` (manual) |
-| **Glama** | [`DanMat/create-packkit`](https://glama.ai/mcp/servers/DanMat/create-packkit) | Admin → Dockerfile → **Build & Release** (manual) |
+| **npm** | `packkit-mcp` | `release.yml` — automatic |
+| **Official MCP registry** | `io.github.DanMat/packkit-mcp` | `release.yml` — automatic |
+| **Glama** | [`DanMat/create-packkit`](https://glama.ai/mcp/servers/DanMat/create-packkit) | Admin → Dockerfile → **Build & Release** — **manual** |
 | **mcpservers.org** | submitted once | — |
 | **awesome-mcp-servers** | README entry + Glama score badge | — |
 
@@ -25,38 +25,68 @@ registry**, so that one matters most.
 | `server.json` | `version`, `packages[0].version` | `mcp/package.json` → `version` |
 | `mcp/server.js` | `new Server({ version })` | `mcp/package.json` → `version` |
 
+`npm run sync:mcp` enforces this — it rewrites `server.json` and `mcp/server.js`
+from `mcp/package.json`, and exits non-zero if `mcpName` and `server.json`'s
+`name` disagree. The Release workflow runs it on every release.
+
 ## What the Release workflow does
 
-`Actions → Release` (workflow_dispatch, pick a bump) handles the **npm** side:
+`Actions → Release` (workflow_dispatch, pick a bump) now handles everything
+except Glama:
 
 1. Bumps + publishes `create-packkit`.
 2. Re-pins `packkit-mcp`'s `create-packkit` dependency and patch-bumps it **only
-   when the create-packkit MAJOR changes** (the caret already tracks minors/patches).
-3. Publishes `packkit-mcp` **only if that version isn't on npm yet**.
-4. Tags and creates the GitHub Release.
+   when the create-packkit MAJOR changes** — see [why](#why-packkit-mcp-isnt-bumped-every-release).
+3. Runs `scripts/sync-mcp-version.mjs` so `server.json` and `mcp/server.js` track
+   `mcp/package.json`'s version (and fails the release if `mcpName` and
+   `server.json`'s `name` ever drift apart).
+4. Publishes `packkit-mcp` to npm **only if that version isn't there yet**.
+5. Publishes the entry to the **official MCP registry** via GitHub OIDC
+   (`mcp-publisher login github-oidc` — no secrets), gated on step 4 actually
+   publishing, because the registry verifies npm ownership.
+6. **Refreshes `mcp/package-lock.json`** against the just-published
+   `create-packkit` and pushes it.
+7. Tags and creates the GitHub Release.
 
-**It does not touch `server.json`, the official registry, or Glama.** So whenever
-`mcp/package.json`'s version changes, do the follow-ups below or those listings
-go stale.
+**Only Glama stays manual** — its build/release is an admin-panel action with no
+public write API (their API is read-only).
 
-## Releasing a new `packkit-mcp` version
+### Why `packkit-mcp` isn't bumped every release
+
+`packkit-mcp` depends on `create-packkit` by caret (`^X.y.z`), so `npx -y
+packkit-mcp` already resolves the newest matching version at install time.
+Republishing it for every create-packkit patch would be version churn with no
+user-visible effect.
+
+What *does* go stale is `mcp/package-lock.json`: builds that run `npm ci` —
+**Glama's, notably** — install the exact version it pins, not the newest. (The
+lockfile isn't in the npm tarball, so it only affects git-clone builds.) That's
+why step 6 refreshes it every release instead of bumping the package version.
+
+## Releasing by hand
+
+Only needed for an out-of-band `packkit-mcp` change (the workflow covers the
+normal path):
 
 ```bash
-# 1. Bump, keeping all four values in sync (see the table above)
-#    mcp/package.json version · server.json version + packages[0].version · mcp/server.js
-# 2. Publish to npm (skip if the Release workflow already did it)
+# 1. Bump mcp/package.json, then sync the other two version sites
+npm run sync:mcp
+
+# 2. Publish to npm — the registry verifies against it, so this comes first
 cd mcp && npm publish && cd ..
 
-# 3. Push it to the official MCP registry (run from the repo root — reads ./server.json)
-mcp-publisher login github     # once per machine/session; browser device-code flow
+# 3. Push the entry to the official registry (run from the repo root; reads ./server.json)
+mcp-publisher login github     # once per machine; browser device-code flow
 mcp-publisher publish
 
 # 4. Verify
 curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=packkit" | python3 -m json.tool
 ```
 
-Then refresh **Glama**: Admin → **Dockerfile** → **Build** (test) → **Build & Release**.
-Without a new release, Glama keeps serving the previous build.
+Either way, finish by refreshing **Glama**: Admin → **Dockerfile** → **Build**
+(test) → **Build & Release**. Without a new release Glama keeps serving the
+previous build — and since it clones the latest `main`, it picks up the
+refreshed lockfile at the same time.
 
 ### Glama build config (known-good)
 
@@ -99,7 +129,10 @@ and answers an introspection request — the tool schemas appear in *Instance lo
    Everything else (name, description, build) is configured in Glama's admin panel
    after claiming.
 
-## Possible improvement
+## Not automated
 
-`release.yml` could sync `server.json` and `mcp/server.js` whenever it bumps
-`mcp/package.json`, so only the registry publish and Glama rebuild stay manual.
+**Glama's build & release.** Everything else (npm, the official registry, the
+version sync, the lockfile refresh) runs in `release.yml`. Glama exposes only a
+read API, so after a release open Admin → Dockerfile → **Build & Release**.
+Its listing metadata still refreshes on its own, since Glama syncs from the
+official registry.
