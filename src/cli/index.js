@@ -6,7 +6,18 @@ import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, OPTION_HE
 import { engineFloor, meetsNodeFloor } from '../core/node.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
-import { writeProject, dirIsEmptyOrMissing, gitInit, installDeps } from './write.js';
+import {
+  writeProject,
+  existingEntries,
+  gitInit,
+  installDeps,
+  hasCommand,
+  githubLogin,
+  createGithubRepo,
+  pushToRemote,
+  writeLockfile,
+  commitAll,
+} from './write.js';
 
 const pkgVersion = () => {
   try {
@@ -38,8 +49,14 @@ Getting started:
   -y, --yes            Accept defaults / preset, no prompts (one-shot)
   --recommended        Alias for -y
   --here               Scaffold into the current directory
+  --merge              Scaffold into a non-empty directory (never overwrites)
   --no-install         Skip dependency install
   --no-git             Skip git init
+
+Create the repo:
+  --github             Create it on GitHub and push (uses the gh CLI)
+  --git-remote <url>   Push to an existing remote (GitLab, Bitbucket, self-hosted)
+  --public             Make the created repo public (default: private)
 
 Stack:
   --language <ts|js>
@@ -144,14 +161,29 @@ export async function run(argv = process.argv.slice(2)) {
     console.error('A package name is required (pass one, or run interactively).');
     process.exit(1);
   }
-  if (!dirIsEmptyOrMissing(targetDir)) {
-    console.error(`Target directory "${basename(targetDir)}" is not empty. Aborting.`);
+  const occupied = existingEntries(targetDir);
+  if (occupied.length && !args.merge) {
+    const sample = occupied.slice(0, 4).join(', ') + (occupied.length > 4 ? ', …' : '');
+    console.error(
+      `Target directory "${basename(targetDir)}" is not empty (${sample}).\n` +
+        `Re-run with --merge to scaffold around what's there — existing files are never overwritten.`,
+    );
     process.exit(1);
   }
 
+  // Resolve the remote *before* generating: the repository URL is baked into
+  // package.json links and README badges at generate time, so creating the repo
+  // afterwards would ship a first commit pointing at nothing.
+  const remote = resolveRemote(args, config);
+  if (remote?.error) {
+    console.error(remote.error);
+    process.exit(1);
+  }
+  if (remote?.url && /^https?:/.test(remote.url)) config.repo = remote.url;
+
   // Generate + write.
   const { files, summary } = generate(config);
-  await writeProject(targetDir, files);
+  const { skipped } = await writeProject(targetDir, files, { merge: args.merge });
 
   // Post steps.
   if (config.gitInit) gitInit(targetDir);
@@ -160,6 +192,40 @@ export async function run(argv = process.argv.slice(2)) {
     s.start(`Installing dependencies with ${config.packageManager}`);
     const ok = installDeps(config.packageManager, targetDir);
     s.stop(ok ? 'Dependencies installed' : 'Install skipped (run it manually)');
+  }
+
+  // Create the remote last, so a failure here still leaves a complete local
+  // project behind — nothing to clean up, just a command to re-run.
+  let pushedTo = null;
+  if (remote) {
+    const s = p.spinner();
+    // A repo pushed without a lockfile fails CI immediately — actions/setup-node
+    // errors when its cache can't find one. Produce it without a full install.
+    if (!config.install) {
+      s.start('Writing a lockfile so CI passes on the first run');
+      const ok = writeLockfile(config.packageManager, targetDir);
+      s.stop(ok ? 'Lockfile written' : `No lockfile — run \`${config.packageManager} install\` and commit it, or CI will fail`);
+    }
+    commitAll(targetDir, 'Add lockfile');
+    s.start(remote.kind === 'github' ? `Creating ${remote.slug} on GitHub` : 'Pushing to origin');
+    const res =
+      remote.kind === 'github'
+        ? createGithubRepo({
+            slug: remote.slug,
+            description: config.description,
+            private: args.private,
+            cwd: targetDir,
+          })
+        : pushToRemote(remote.url, targetDir);
+    s.stop(res.ok ? `Pushed to ${remote.url}` : 'Could not create the remote');
+    if (res.ok) pushedTo = remote.url;
+    else {
+      const retry =
+        remote.kind === 'github'
+          ? `gh repo create ${remote.slug} --${args.private ? 'private' : 'public'} --source . --remote origin --push`
+          : `git remote add origin ${remote.url} && git push -u origin HEAD`;
+      console.error(`\n${res.error || 'The command failed.'}\n\nThe project is scaffolded. To retry:\n  cd ${basename(targetDir)} && ${retry}`);
+    }
   }
 
   const rel = args.here ? '.' : config.name;
@@ -178,9 +244,14 @@ export async function run(argv = process.argv.slice(2)) {
       ? `This is a ${config.framework} component library — \`${runWord(config)} dev\` rebuilds on change (there's no dev server). For a runnable app, scaffold the "${config.framework}-app" preset instead.`
       : null,
     `Requires Node >= ${floor}${nodeOk ? '' : ` — you're on ${process.version}, upgrade first`}.`,
+    skipped.length
+      ? `Kept ${skipped.length} existing file${skipped.length > 1 ? 's' : ''} — Packkit's version was not written: ${skipped.join(', ')}`
+      : null,
   ].filter(Boolean);
 
-  const done = `Created ${summary.name} — ${summary.fileCount} files · ${summary.stack.join(' · ')}`;
+  const done =
+    `Created ${summary.name} — ${summary.fileCount - skipped.length} files · ${summary.stack.join(' · ')}` +
+    (pushedTo ? `\n${pushedTo}` : '');
   if (interactive) {
     p.note(next.join('\n') || 'You are all set.', 'Next steps');
     if (hints.length) p.log.info(hints.join('\n'));
@@ -197,6 +268,43 @@ export async function run(argv = process.argv.slice(2)) {
 
 function runWord(config) {
   return config.packageManager === 'npm' ? 'npm run' : config.packageManager;
+}
+
+// owner/name for the repo to create: an explicit --repo URL wins, otherwise the
+// authenticated gh account plus the project name.
+function githubSlug(repoUrl, login, name) {
+  const m = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/*$/.exec(repoUrl || '');
+  if (m) return `${m[1]}/${m[2]}`;
+  return login ? `${login}/${name}` : null;
+}
+
+/**
+ * Work out what remote to create, if any. Returns null (nothing to do),
+ * { error } to abort before writing anything, or the resolved target.
+ */
+function resolveRemote(args, config) {
+  if (!args.github && !args.gitRemote) return null;
+  if (!config.gitInit) {
+    return { error: 'Creating a repo needs a local git repo — drop --no-git.' };
+  }
+  if (args.gitRemote) return { kind: 'remote', url: args.gitRemote };
+
+  // Delegate to `gh` rather than calling the API: it already holds the user's
+  // credentials, so Packkit never reads, prompts for, or stores a token.
+  if (!hasCommand('gh')) {
+    return {
+      error:
+        '--github needs the GitHub CLI. Install it (https://cli.github.com), or use\n' +
+        '--git-remote <url> to push to a repo you have already created.',
+    };
+  }
+  const login = githubLogin();
+  if (!login) {
+    return { error: '--github needs an authenticated GitHub CLI. Run: gh auth login' };
+  }
+  const slug = githubSlug(config.repo, login, config.name);
+  if (!slug) return { error: 'Could not work out the repository name. Pass --repo <url>.' };
+  return { kind: 'github', slug, url: `https://github.com/${slug}` };
 }
 
 // Load a partial config from --from <file>, or a packkit.config.json in cwd.

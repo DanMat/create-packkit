@@ -31,6 +31,36 @@ npx create-packkit --preset full my-pkg --pm pnpm
 
 Then `cd`, and you already have a working project — `build`, `test`, and `lint` all pass out of the box.
 
+## Create the repo, not just the folder
+
+Packkit can create the remote and push the first commit, so you don't have to make an empty repo in a browser first:
+
+```sh
+# create it on GitHub (private) and push
+npx create-packkit ts-lib my-lib --github
+
+# public instead
+npx create-packkit ts-lib my-lib --github --public
+
+# any other host — GitLab, Bitbucket, Gitea, self-hosted
+npx create-packkit ts-lib my-lib --git-remote git@bitbucket.org:me/my-lib.git
+```
+
+`--github` shells out to the [GitHub CLI](https://cli.github.com), so **Packkit never asks for, reads, or stores a token** — `gh` already holds your credentials. Created repos are **private unless you pass `--public`**.
+
+This also fixes your links: the repository URL is baked into `package.json` and the README's CI badges when the files are generated, so letting Packkit resolve it up front means the badges point somewhere real from the first commit.
+
+### Scaffolding into a repo you already have
+
+Already cloned an empty repo, or started some work? `--merge` scaffolds around what's there:
+
+```sh
+git clone git@github.com:me/my-lib.git && cd my-lib
+npx create-packkit ts-lib my-lib --here --merge
+```
+
+**Existing files are never overwritten.** Anything that collides is left alone and reported, so you can diff at your leisure. (A directory containing only `.git` counts as empty — a fresh clone scaffolds without needing `--merge` at all.)
+
 ## Or configure it on the web
 
 No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx create-packkit` command). Everything runs in your browser.
