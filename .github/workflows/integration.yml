@@ -37,6 +37,7 @@ jobs:
           - svelte-app
           - node-service
           - monorepo
+          - fullstack
           - oss
           - full
           - minimal
