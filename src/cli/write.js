@@ -67,6 +67,27 @@ export function installDeps(pm, cwd) {
   return run(pm, ['install'], cwd, { quiet: false });
 }
 
+// Resolving the dependency graph without downloading it. Yarn has no equivalent
+// that works across its v1/v2+ split, so it's left out and reported instead.
+const LOCKFILE_ONLY = {
+  npm: ['install', '--package-lock-only', '--ignore-scripts'],
+  pnpm: ['install', '--lockfile-only', '--ignore-scripts'],
+  bun: ['install', '--lockfile-only'],
+};
+
+/**
+ * Write a lockfile without installing.
+ *
+ * A pushed repo with no lockfile fails CI on its very first run — `cache: npm`
+ * in actions/setup-node errors outright when it can't find one. So when we're
+ * about to create a remote but the install was skipped, produce the lockfile
+ * anyway. Returns false when the package manager has no such mode.
+ */
+export function writeLockfile(pm, cwd) {
+  const args = LOCKFILE_ONLY[pm];
+  return args ? run(pm, args, cwd) : false;
+}
+
 /** Run a command and capture its output. Never throws. */
 function capture(cmd, args, cwd) {
   const res = spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });

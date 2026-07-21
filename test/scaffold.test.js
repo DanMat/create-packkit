@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeProject, existingEntries, dirIsEmptyOrMissing } from '../src/cli/write.js';
+import { writeProject, existingEntries, dirIsEmptyOrMissing, writeLockfile } from '../src/cli/write.js';
 
 const tmp = () => mkdtemp(join(tmpdir(), 'packkit-'));
 
@@ -46,6 +46,12 @@ test('merge never overwrites, and reports what it kept', async () => {
   assert.equal(await readFile(join(dir, 'README.md'), 'utf8'), 'ORIGINAL');
   assert.equal(await readFile(join(dir, 'src/index.ts'), 'utf8'), 'export const mine = 1;');
   assert.equal(await readFile(join(dir, 'tsconfig.json'), 'utf8'), '{}');
+});
+
+test('writeLockfile reports failure for package managers without a lockfile-only mode', async () => {
+  // Yarn has no mode that works across its v1/v2+ split, so the caller has to
+  // warn rather than silently push a repo whose first CI run will fail.
+  assert.equal(writeLockfile('yarn', await tmp()), false);
 });
 
 test('without merge every file is written, nested dirs created', async () => {

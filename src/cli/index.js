@@ -15,6 +15,7 @@ import {
   githubLogin,
   createGithubRepo,
   pushToRemote,
+  writeLockfile,
   commitAll,
 } from './write.js';
 
@@ -197,8 +198,15 @@ export async function run(argv = process.argv.slice(2)) {
   // project behind — nothing to clean up, just a command to re-run.
   let pushedTo = null;
   if (remote) {
-    if (config.install) commitAll(targetDir, 'Add lockfile');
     const s = p.spinner();
+    // A repo pushed without a lockfile fails CI immediately — actions/setup-node
+    // errors when its cache can't find one. Produce it without a full install.
+    if (!config.install) {
+      s.start('Writing a lockfile so CI passes on the first run');
+      const ok = writeLockfile(config.packageManager, targetDir);
+      s.stop(ok ? 'Lockfile written' : `No lockfile — run \`${config.packageManager} install\` and commit it, or CI will fail`);
+    }
+    commitAll(targetDir, 'Add lockfile');
     s.start(remote.kind === 'github' ? `Creating ${remote.slug} on GitHub` : 'Pushing to origin');
     const res =
       remote.kind === 'github'
