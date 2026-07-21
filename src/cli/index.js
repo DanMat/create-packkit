@@ -247,6 +247,11 @@ export async function run(argv = process.argv.slice(2)) {
     skipped.length
       ? `Kept ${skipped.length} existing file${skipped.length > 1 ? 's' : ''} — Packkit's version was not written: ${skipped.join(', ')}`
       : null,
+    // Said here too, not just in the README: this is the moment a red X appears
+    // on a repo that is ten seconds old, and the cause is not obvious.
+    pushedTo && config.workflows?.includes('npm-publish') && config.release === 'changesets'
+      ? `The Release workflow will fail until npm credentials exist — set up npm Trusted Publishing, or add an NPM_TOKEN secret. See "Releasing" in the README.`
+      : null,
   ].filter(Boolean);
 
   const done =
