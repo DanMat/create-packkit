@@ -20,6 +20,7 @@ const OVERRIDE_FLAGS = {
   description: 'description',
   keywords: 'keywords',
   repo: 'repo',
+  'monorepo-layout': 'monorepoLayout',
 };
 
 // Boolean options that default ON — a --no-<flag> turns them off.

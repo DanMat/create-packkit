@@ -11,6 +11,7 @@ import {
   hasCommand,
   githubLogin,
   createGithubRepo,
+  writeLockfile,
   commitAll,
 } from 'create-packkit/scaffold';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -34,13 +35,18 @@ const TOOLS = [
   {
     name: 'packkit_schema',
     description:
-      'Return every Packkit option, preset, and shortcut alias as JSON. Call this first to learn what can be configured.',
+      'START HERE. Returns every Packkit option, preset, and shortcut alias as JSON. ' +
+      'Call this before scaffolding so you pick a preset that matches what the user actually wants — ' +
+      'presets range from single libraries to CLIs, HTTP services, SPAs, and full-stack monorepos, ' +
+      'and guessing without reading them is the main cause of scaffolding the wrong shape.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'packkit_preview',
     description:
-      'Preview the files Packkit would generate for a config, without writing anything. Returns the stack summary and the file tree.',
+      'Show the project structure a config would produce — the full file tree and stack summary — without writing anything. ' +
+      'Use this to check the layout before committing to it, and to show the user what they are about to get. ' +
+      'Cheap and side-effect free, so prefer it over scaffolding to a throwaway directory to see what happens.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -54,7 +60,10 @@ const TOOLS = [
   {
     name: 'packkit_scaffold',
     description:
-      'Generate a project to disk. Writes files under <directory>/<name> (or ./<name>), optionally runs git init and installs dependencies.',
+      'Generate a project to disk. Writes files under <directory>/<name> (or ./<name>), optionally runs git init, ' +
+      'installs dependencies, and creates the GitHub repository. ' +
+      'Call packkit_schema first if you have not already — picking the preset by guess is how projects end up the wrong shape. ' +
+      'If the target directory already has files in it (an existing clone, for instance), pass merge: true rather than failing.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,7 +89,7 @@ function fileTree(files) {
   return Object.keys(files).sort().map((p) => `  ${p}`).join('\n');
 }
 
-const server = new Server({ name: 'packkit', version: '0.2.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'packkit', version: '0.2.1' }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
@@ -134,7 +143,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         steps.push(installDeps(config.packageManager, targetDir) ? 'dependencies installed' : 'install failed (run it manually)');
       }
       if (slug) {
-        if (args.install) commitAll(targetDir, 'Add lockfile');
+        // Pushing without a lockfile makes the new repo's first CI run fail.
+        if (!args.install) writeLockfile(config.packageManager, targetDir);
+        commitAll(targetDir, 'Add lockfile');
         const res = createGithubRepo({
           slug,
           description: config.description,
