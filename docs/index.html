@@ -29,6 +29,10 @@
   .links a:hover { border-color: var(--accent); }
 
   main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 61px); }
+  /* Grid items default to min-width:auto, so a long unwrapped command sets the
+     column's minimum width and the whole panel grows with it. min-width:0 lets
+     the columns hold their share and the overflow-x below actually scroll. */
+  main > *, .split > * { min-width: 0; }
   @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 
   .config { padding: 22px 24px; overflow-y: auto; }

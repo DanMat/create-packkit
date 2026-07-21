@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generate, fromPreset, normalizeConfig, PRESETS, PRESET_INFO } from '../src/core/index.js';
+import { generate, fromPreset, normalizeConfig, PRESETS, PRESET_INFO, OPTIONS } from '../src/core/index.js';
 
 test('node-service: Hono app, Dockerfile, private, start script', () => {
   const out = generate(fromPreset('node-service', { name: 'svc' }));
@@ -370,4 +370,16 @@ test('packkit.json is deterministic — same config, same bytes', () => {
     generate(fromPreset('ts-lib', cfg)).files['packkit.json'],
     generate(fromPreset('ts-lib', cfg)).files['packkit.json'],
   );
+});
+
+test('options that do not apply declare it, so surfaces can hide them', () => {
+  // The web configurator showed these regardless, so changing them altered
+  // neither the command nor the generated files — which reads as a broken app.
+  assert.equal(typeof OPTIONS.serviceFramework.when, 'function');
+  assert.equal(OPTIONS.serviceFramework.when({ target: ['library'] }), false);
+  assert.equal(OPTIONS.serviceFramework.when({ target: ['library', 'service'] }), true);
+
+  assert.equal(typeof OPTIONS.monorepoLayout.when, 'function');
+  assert.equal(OPTIONS.monorepoLayout.when({ monorepo: false }), false);
+  assert.equal(OPTIONS.monorepoLayout.when({ monorepo: true }), true);
 });
