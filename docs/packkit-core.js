@@ -47,6 +47,7 @@ var OPTIONS = {
     type: "select",
     label: "Service framework (HTTP service)",
     default: "hono",
+    when: (cfg) => cfg.target?.includes("service"),
     choices: [
       { value: "hono", label: "Hono (fast, web-standard)" },
       { value: "fastify", label: "Fastify" },

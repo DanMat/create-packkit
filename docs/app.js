@@ -18,12 +18,22 @@ function renderForm() {
   const form = $('#form');
   form.innerHTML = '';
   for (const group of GROUPS) {
-    const keys = Object.keys(OPTIONS).filter((k) => OPTIONS[k].group === group.id && !HIDDEN.has(k));
+    const keys = Object.keys(OPTIONS).filter(
+      (k) => OPTIONS[k].group === group.id && !HIDDEN.has(k) && applies(k, state),
+    );
     if (!keys.length) continue;
     const wrap = el('div', { className: 'group' }, el('h3', { textContent: group.label }));
     for (const key of keys) wrap.append(renderField(key));
     form.append(wrap);
   }
+}
+
+// An option that doesn't apply to the current config (a service framework with
+// no service target, a monorepo layout with no monorepo) is hidden rather than
+// shown-and-ignored: changing it would alter neither the command nor the files.
+function applies(key, cfg) {
+  const when = OPTIONS[key].when;
+  return typeof when === 'function' ? !!when(cfg) : true;
 }
 
 function renderField(key) {
