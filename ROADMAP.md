@@ -71,6 +71,38 @@ _First unsolicited review from an agent that used Packkit to build a real intern
 
 **Two we should not act on as written.** The *"Node 22 vs 24 friction"* is the `--doctor`/engine preflight working correctly — it refuses to scaffold a project whose eslint/vite/vitest can't run, with the exact `nvm install` fix. Removing that trades one loud error for a broken install. Worth making the message more actionable, not softer. And *"overwrite risk"* in `--here` is inverted: it never overwrites, it hard-aborts — the fix is the merge mode above, not more guardrails.
 
+## From architecture review (2026)
+_Second external review, this one of the codebase rather than the experience. Ratings: architecture 8.5, engineering 8, product 7, OSS readiness 8, maintainability 7. Every claim below was checked against the code before being written down._
+
+**The theme worth acting on: Packkit doesn't eat its own cooking.** It generates `publint` + are-the-types-wrong checks, strict TypeScript, and lint gates for other people's packages, then ships without any of them. `npm run check:pkg` is something Packkit writes for you, not something it runs on itself — and its own package would fail it.
+
+- [ ] **Type declarations for the public API** — `exports` exposes `.`, `./core`, `./cli`, `./scaffold`, with **no `types`**. Programmatic consumers and the MCP server get nothing. JSDoc + `tsc --declaration` is enough; a rewrite isn't needed. Types wanted for `PackkitConfig`, the resolved config, `GenerateResult`, the file map, preset names, and scaffold results. **v3 requirement.**
+- [ ] **Self-enforcement** — root scripts are `start, test, check:deps, integration, build:web, update:node, gen:reference, sync:mcp`. No lint, no format check, no typecheck. Add a `check` script running all of them, plus `tsc --allowJs --checkJs --noEmit` to catch API drift even while the source stays JS.
+- [ ] **Validate generated paths at the writer** — `writeProject` joins each relative path onto the target and writes it. Fine while every feature is trusted first-party code; a security boundary the moment third-party features, community recipes, or MCP-supplied data can contribute paths. Reject absolute paths, `..` escapes, and post-normalization collisions **in the writer**, not per feature — before extensibility ships, not after.
+- [ ] **Collision diagnostics** — `deepMerge` ends in `return source`, so when two features set the same `scripts.build` or `exports` key the last one silently wins. Additive fields (dependencies) should keep merging; `scripts`, `exports`, `bin`, `files` should report which features collided. Same for two features emitting the same file path.
+- [ ] **Structured subprocess errors** — `run()` returns a boolean and discards stdout/stderr when quiet, so "install failed" can't distinguish a missing executable from a network error, an unconfigured git identity, or a rejected push. Return `{ ok, command, exitCode, stdout, stderr, category }`; the CLI can still print something friendly, while MCP callers get something actionable.
+- [ ] **Windows command-execution tests** — `run()` and `capture()` both set `shell: true` on win32, where quoting and metacharacter handling change. Test repo slugs, descriptions, remote URLs, and paths containing spaces, `&`, quotes, pipes, parens, and Unicode. Prefer resolving the executable (or `.cmd`) over enabling the shell globally.
+- [ ] **Test the packed tarball** — `npm pack`, install the tgz, then check every export path resolves, the shebang and exec bit survive, only intended files ship, and the core stays browser-safe. The `./scaffold` export added in 2.8 makes this sharper: it pulls `node:child_process` into the published surface.
+
+### Architecture, once the gates are in
+
+- [ ] **Staged resolution with diagnostics** — `normalizeConfig` now applies defaults, coerces conflicts, derives helpers, and encodes framework/target policy in one pass, and **silently** disables what it can't support. Split into ordered stages returning `{ config, changes[], warnings[], errors[] }` so "we turned Storybook off because this isn't a component library" is reported rather than inferred.
+- [ ] **A resolved domain model** — the config carries ~16 derived booleans (`isReact`, `hasApp`, `publishable`, `usesVite`…) that can in principle contradict each other. Features should consume `resolved.targets` / `resolved.build` / `resolved.package` instead of re-interpreting raw selections.
+- [ ] **Make feature ordering explicit** — features merge in array order, so order silently decides who wins. Give them ids, phases, `requires`, `conflictsWith`, and detect collisions rather than relying on position.
+- [ ] **Pairwise combination testing** — the integration matrix covers presets, which are the *common* paths. The risk is cross-feature interaction (dual + Rollup + Jest + Biome). Generate a matrix where every option pair appears at least once.
+- [ ] **Dependency version catalog** — template versions are embedded across feature modules. Centralize them with compatibility notes and a last-reviewed date; the freshness workflow already treats them as product data, this makes that explicit.
+- [ ] **Unify monorepo and single-package generation** — `generate()` returns early for monorepos, and 2.9 added a second early return inside that. Modelling a project as workspaces (a plain package being a project with one) would stop features having to be implemented twice.
+
+### The strategic one
+
+- [ ] **`packkit upgrade`** — read `packkit.json`, generate the current recommended output in memory, diff it against the repo, and classify each difference: safe auto-update, user-modified, deprecated dependency, changed best practice, manual migration. Then emit a patch or a PR. **Both reviews independently landed on this**, and 2.9's provenance file was the prerequisite. It's what turns a one-time generator into something with a durable relationship to the repos it creates — one-time scaffolders are easy to replace; a tool that keeps repos current isn't.
+
+### Checked and not acted on
+
+- **"Add shareable configuration URLs"** — already shipped in 2.3. There's a Share link button that encodes the diff-from-defaults and restores it on load.
+- **"Add privacy-preserving product analytics"** — this is a static GitHub Pages site with no backend. Analytics means adding third-party tracking to a developer tool, which is a values call rather than a task. Deliberately parked.
+- **Positioning: the two reviews disagree.** The field review's top ask was a full-stack monorepo preset (shipped in 2.9); this one argues apps dilute a product whose coherent domain is packages/CLIs/services. Both are reasonable. Current stance: packages, CLIs and services stay the centre of gravity — that's where packaging, exports, provenance and release correctness compound — and `fullstack` stays a supported track rather than the start of chasing framework starters.
+
 ## Agent / automation reach
 - [x] ~~Non-interactive CLI + flag parity · `--schema` + `llms.txt` · preset shortcuts · MCP server~~ — **Shipped.**
 - [ ] **Publicize** — dev.to / Show HN post, `awesome-*` list PRs, npm keywords, register the `llms.txt`. _(Drafts ready in `marketing/`; needs the author's accounts.)_
