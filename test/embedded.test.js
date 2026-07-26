@@ -351,3 +351,21 @@ test('the public project has no leaked internal extension state', () => {
   assert.equal(p._extensions, undefined, 'no _extensions on the object');
   assert.deepEqual(Object.keys(p).sort(), ['config', 'deploymentContract', 'diagnostics', 'files', 'metadata', 'summary']);
 });
+
+test('definition replay preserves the original add/replace mode across a round-trip', () => {
+  // add: a host file Packkit does NOT generate must stay "add" after replay,
+  // so a future version that starts generating it can still flag the drift.
+  const added = extendProject(createProject({ preset: 'ts-lib', name: 'lib' }), {
+    files: { 'custom-file.txt': 'host content' },
+  });
+  const replayedAdd = createProjectFromDefinition(exportProjectDefinition(added));
+  assert.equal(exportProjectDefinition(replayedAdd).extensions.files['custom-file.txt'].mode, 'add');
+
+  // replace: a deliberate override of a generated file must stay "replace".
+  const replaced = extendProject(createProject({ preset: 'ts-lib', name: 'lib' }), {
+    files: { 'package.json': 'REPLACED' },
+    collisionPolicy: 'overwrite',
+  });
+  const replayedReplace = createProjectFromDefinition(exportProjectDefinition(replaced));
+  assert.equal(exportProjectDefinition(replayedReplace).extensions.files['package.json'].mode, 'replace');
+});

@@ -50,6 +50,12 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [ ] **Vue/Svelte app scaffolds with a router** — the app targets are minimal SPAs; add vue-router / SvelteKit-style routing (plus a React Router option).
 - [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
 
+### Embedded API follow-ups (from the 3.0 review)
+_Non-blocking items deferred from PR #17. The blockers (symlink safety, replay mode-preservation) shipped in 3.0._
+
+- [ ] **Document the writer's threat model** — the writer is safe against hostile file maps and pre-existing symlinks, but not race-proof: a TOCTOU window exists between the symlink/collision preflight and the `mkdir`/`writeFile`, so another process mutating the destination concurrently could still redirect a write. The intended use is a private temp workspace, where this doesn't arise. State that boundary in [EMBEDDING.md](docs/EMBEDDING.md) rather than claiming protection we don't provide. (An `O_NOFOLLOW`/`openat`-style atomic write would close it, but isn't warranted for the current use.)
+- [ ] **`driftPolicy` option for `createProjectFromDefinition`** — replay currently returns the project with an **error-severity** diagnostic when a stored `add` now collides with a generated file (it does not throw). That's deliberate — it preserves the original output — but a consumer treating any `severity: 'error'` as a hard failure would misread it. Add `createProjectFromDefinition(def, { driftPolicy: 'report' | 'error' })` so throwing is opt-in, and document that a returned project may carry error diagnostics until then.
+
 ## Ideas from real-world research (2026)
 _From mining pain points across create-typescript-app, tsup, Changesets, create-t3-app, and current "publish an npm package" guides. Ordered by demand × fit._
 

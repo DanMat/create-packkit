@@ -137,8 +137,13 @@ export function createProject(input = {}) {
  * validated; collisions with existing files follow collisionPolicy ('error'
  * by default), and host overrides of existing package fields are reported.
  */
-export function extendProject(project, extension = {}) {
+export function extendProject(project, extension = {}, internal = {}) {
   assertProject(project);
+  // Internal: a path→mode map lets definition replay preserve the ORIGINAL
+  // add/replace intent instead of re-deriving it against the current base.
+  // Without it, an `add` that now collides would be re-recorded as `replace`,
+  // and the drift warning would vanish after one load-and-save cycle.
+  const storedModes = internal.fileModes || null;
   const policy = extension.collisionPolicy || 'error';
   if (!['error', 'skip', 'overwrite'].includes(policy)) {
     throw new TypeError(`Unknown collisionPolicy "${policy}".`);
@@ -184,8 +189,11 @@ export function extendProject(project, extension = {}) {
     // "add" = the host introduced a path Packkit didn't generate; "replace" =
     // deliberately overriding generated output. Recorded so a stored definition
     // can tell, on replay under a newer Packkit, whether an add now collides
-    // with a file that version started generating.
-    stateFiles[target] = { content: contents, mode: collides ? 'replace' : 'add' };
+    // with a file that version started generating. A stored mode (from replay)
+    // wins over the freshly-computed one, so the original intent survives a
+    // load-and-save round-trip.
+    const mode = storedModes && target in storedModes ? storedModes[target] : collides ? 'replace' : 'add';
+    stateFiles[target] = { content: contents, mode };
   }
 
   let packageJson = prevState.packageJson;
@@ -250,9 +258,11 @@ export function createProjectFromDefinition(definition) {
   const ext = definition.extensions || {};
   const extFiles = ext.files || {};
   const plainFiles = {};
+  const storedModes = {};
   for (const [path, entry] of Object.entries(extFiles)) {
     const { content, mode } = normalizeDefinitionFile(entry);
     plainFiles[path] = content;
+    storedModes[validateRelativePath(path).normalized] = mode;
     // A file the host originally *added* now collides with something this
     // Packkit version generates: surface it loudly instead of silently taking
     // the stored copy. The definition still reproduces (the host file wins, as
@@ -269,8 +279,10 @@ export function createProjectFromDefinition(definition) {
   }
 
   const hasExt = Object.keys(plainFiles).length || Object.keys(ext.packageJson || {}).length;
+  // Carry the stored modes so re-exporting the replayed project preserves the
+  // original add/replace intent rather than re-deriving it against this base.
   const result = hasExt
-    ? extendProject(base, { files: plainFiles, packageJson: ext.packageJson || {}, collisionPolicy: 'overwrite' })
+    ? extendProject(base, { files: plainFiles, packageJson: ext.packageJson || {}, collisionPolicy: 'overwrite' }, { fileModes: storedModes })
     : base;
   result.diagnostics.push(...drift);
   return result;
@@ -414,7 +426,7 @@ function validateDefinition(definition) {
         for (const [p, entry] of Object.entries(files)) {
           const content = typeof entry === 'string' ? entry : entry && entry.content;
           if (typeof content !== 'string') fail('INVALID_FILE_CONTENT', `extensions.files["${p}"] must have string content.`, p);
-          else total += content.length;
+          else total += Buffer.byteLength(content, 'utf8'); // count UTF-8 bytes, matching the "bytes" limit
         }
         if (total > MAX_DEFINITION_BYTES) fail('DEFINITION_TOO_LARGE', `Definition content is ${total} bytes (max ${MAX_DEFINITION_BYTES}).`, 'extensions.files');
         for (const d of validatePathMap(Object.fromEntries(paths.map((p) => [p, '']))).diagnostics) errs.push({ ...d, source: 'definition' });
