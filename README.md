@@ -193,14 +193,32 @@ There's also an [`llms.txt`](llms.txt) (served at [danmat.github.io/create-packk
 { "mcpServers": { "packkit": { "command": "npx", "args": ["-y", "packkit-mcp"] } } }
 ```
 
+## Embed Packkit in your own app
+
+Packkit ships a typed, side-effect-free API so a Node application can use it as a
+project-generation engine — generate in memory, add your own deployment files,
+and write to disk when you're ready. No prompts, installs, git, or network.
+
+```js
+import { createProject, extendProject, writeGeneratedProject } from 'create-packkit/embedded';
+
+const project = createProject({ preset: 'react-app', name: 'weather-dashboard' });
+const extended = extendProject(project, { files: { '.github/workflows/deploy.yml': deployYaml } });
+await writeGeneratedProject({ project: extended, destination: '/tmp/weather-dashboard' });
+```
+
+Full guide, including diagnostics, reproducible definitions, digests, and the
+provider-neutral deployment contract: **[Embedding Packkit](docs/EMBEDDING.md)**.
+
 ## How it works
 
 Packkit is a pure `config → { files }` **core** that runs in both Node and the browser:
 
 - the **CLI** writes the files to disk, runs `git init`, and installs dependencies;
-- the **web configurator** zips the same files client-side (no server).
+- the **web configurator** zips the same files client-side (no server);
+- the **embedded API** ([`create-packkit/embedded`](docs/EMBEDDING.md)) hands the file map to a host application.
 
-Both drive from one options schema ([`src/core/options.js`](src/core/options.js)), so the CLI and the web page always stay in sync.
+All three drive from one options schema ([`src/core/options.js`](src/core/options.js)), so they always stay in sync.
 
 ## Staying fresh
 

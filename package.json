@@ -6,15 +6,29 @@
   "bin": {
     "create-packkit": "bin/cli.js"
   },
+  "types": "./types/index.d.ts",
   "exports": {
-    ".": "./src/core/index.js",
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
     "./core": "./src/core/index.js",
+    "./embedded": {
+      "types": "./types/embedded.d.ts",
+      "default": "./src/embedded/index.js"
+    },
+    "./writer": {
+      "types": "./types/writer.d.ts",
+      "default": "./src/embedded/writer.js"
+    },
     "./cli": "./src/cli/index.js",
-    "./scaffold": "./src/cli/write.js"
+    "./scaffold": "./src/cli/write.js",
+    "./package.json": "./package.json"
   },
   "files": [
     "bin",
     "src",
+    "types",
     "README.md",
     "LICENSE",
     "llms.txt"

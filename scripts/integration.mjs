@@ -13,12 +13,16 @@ import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
-const argv = process.argv.slice(2);
+let argv = process.argv.slice(2);
+// --embedded generates through the embedded API instead of the CLI, so the same
+// install/build/test/lint checks also cover the programmatic path a host uses.
+const embedded = argv.includes('--embedded');
+argv = argv.filter((a) => a !== '--embedded');
 if (!argv.length) {
-  console.error('usage: node scripts/integration.mjs <preset> [flags...]');
+  console.error('usage: node scripts/integration.mjs <preset> [flags...] [--embedded]');
   process.exit(2);
 }
-const label = argv.join(' ');
+const label = (embedded ? 'embedded ' : '') + argv.join(' ');
 
 const work = mkdtempSync(join(tmpdir(), 'packkit-int-'));
 const app = join(work, 'app');
@@ -28,10 +32,44 @@ function step(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { stdio: 'inherit', ...opts }).status === 0;
 }
 
-// 1) generate via the real CLI (non-interactive)
-if (!step('node', [join(repo, 'bin/cli.js'), ...argv, 'app', '--no-git', '--no-install'], { cwd: work })) {
+// 1) generate — via the CLI, or (for --embedded) the programmatic API, which
+// also adds a deployment workflow, checks the deployment contract, and confirms
+// the definition round-trips to an identical digest.
+if (embedded) {
+  if (!(await generateEmbedded())) process.exit(1);
+} else if (!step('node', [join(repo, 'bin/cli.js'), ...argv, 'app', '--no-git', '--no-install'], { cwd: work })) {
   console.error(`\n✗ [${label}] generation failed`);
   process.exit(1);
+}
+
+async function generateEmbedded() {
+  const { createProject, extendProject, exportProjectDefinition, createProjectFromDefinition, calculateProjectDigest } =
+    await import(join(repo, 'src/embedded/index.js'));
+  const { writeGeneratedProject } = await import(join(repo, 'src/embedded/writer.js'));
+
+  const preset = argv[0];
+  const project = createProject({ preset, name: 'app', overrides: { install: false, gitInit: false } });
+  const fatal = project.diagnostics.filter((d) => d.severity === 'error');
+  if (fatal.length) {
+    console.error(`\n✗ [${label}] createProject reported errors:`, fatal);
+    return false;
+  }
+  const extended = extendProject(project, {
+    files: { '.platform/deploy.yml': `# generated deploy contract\n${JSON.stringify(project.deploymentContract, null, 2)}\n` },
+  });
+  // Reproducibility: a stored definition must rebuild byte-for-byte.
+  const recreated = createProjectFromDefinition(exportProjectDefinition(extended));
+  if (calculateProjectDigest(extended) !== calculateProjectDigest(recreated)) {
+    console.error(`\n✗ [${label}] digest changed after definition round-trip`);
+    return false;
+  }
+  if (!recreated.deploymentContract?.type) {
+    console.error(`\n✗ [${label}] missing deployment contract`);
+    return false;
+  }
+  const res = await writeGeneratedProject({ project: recreated, destination: app });
+  console.log(`✓ embedded: wrote ${res.writtenFiles.length} files · contract ${recreated.deploymentContract.type} · digest stable`);
+  return true;
 }
 
 // Real usage runs `git init` before install; some hook `prepare` scripts

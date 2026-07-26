@@ -22,23 +22,42 @@ export function fromPreset(name, overrides = {}) {
   return cfg;
 }
 
-/** Turn a config into a complete set of files. */
-export function generate(input) {
-  const cfg = normalizeConfig(input);
-  if (cfg.monorepo) return buildMonorepo(cfg);
-
+/**
+ * Run every active feature, collecting its files and package.json fragment.
+ * Returns the raw material — file map, the fragments in contribution order,
+ * and which feature produced each file — so callers that need provenance (the
+ * embedded API's collision detection) get it without a second pass, while
+ * `generate` folds it into the same output as before.
+ */
+export function assemble(cfg) {
   const files = {};
+  const fileSources = {};
+  const fragments = [];
   let pkg = {};
 
   for (const feat of features) {
     if (!feat.active(cfg)) continue;
     const out = feat.apply(cfg) || {};
     if (out.files) {
-      for (const [path, contents] of Object.entries(out.files)) files[path] = contents;
+      for (const [path, contents] of Object.entries(out.files)) {
+        (fileSources[path] ||= []).push(feat.id);
+        files[path] = contents;
+      }
     }
-    if (out.pkg) pkg = deepMerge(pkg, out.pkg);
+    if (out.pkg) {
+      fragments.push({ source: feat.id, pkg: out.pkg });
+      pkg = deepMerge(pkg, out.pkg);
+    }
   }
+  return { files, fileSources, fragments, pkg };
+}
 
+/** Turn a config into a complete set of files. */
+export function generate(input) {
+  const cfg = normalizeConfig(input);
+  if (cfg.monorepo) return buildMonorepo(cfg);
+
+  const { files, pkg } = assemble(cfg);
   files['package.json'] = toJson(finalizePackageJson(pkg));
   files['packkit.json'] = provenance(cfg);
 

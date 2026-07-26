@@ -39,6 +39,12 @@ jobs:
           - monorepo
           - fullstack
           - oss
+          # Embedded API — generate through createProject/writeGeneratedProject,
+          # add a deploy file, and confirm the same install/build/test/lint pass.
+          - ts-lib --embedded
+          - cli --embedded
+          - react-app --embedded
+          - node-service --embedded
           - full
           - minimal
           - react-lib --storybook

@@ -260,21 +260,42 @@ export function defaultConfig() {
   return cfg;
 }
 
-/** Merge partial input over the defaults and coerce a few fields. */
-export function normalizeConfig(input = {}) {
+/**
+ * Merge partial input over the defaults and coerce a few fields.
+ *
+ * Pass a `diagnostics` array to have every coercion that overrides an
+ * explicitly-supplied value recorded there (the embedded API surfaces these so
+ * a host application learns when Packkit changed its requested config, instead
+ * of the change happening silently). Existing callers omit it and see identical
+ * behavior — the coercions run exactly the same either way.
+ */
+export function normalizeConfig(input = {}, diagnostics = null) {
   const cfg = { ...defaultConfig(), ...input };
+  const requested = new Set(Object.keys(input));
 
-  // A CLI target needs an executable build; JS `strict` isn't a thing, etc.
-  if (!Array.isArray(cfg.target) || cfg.target.length === 0) cfg.target = ['library'];
-  if (!Array.isArray(cfg.workflows)) cfg.workflows = [];
+  // Record a coercion only when it actually changes an explicitly-requested
+  // value — a field left at its default that "changes" to the same default is
+  // not news. Derived helper flags (isTs, hasApp…) go through plain assignment
+  // below; they are computed, not overrides, so they never emit a diagnostic.
+  const coerce = (field, value, code, message, severity = 'warning') => {
+    const same = JSON.stringify(cfg[field]) === JSON.stringify(value);
+    if (same) return;
+    const previousValue = cfg[field];
+    cfg[field] = value;
+    if (diagnostics && requested.has(field)) {
+      diagnostics.push({ severity, code, field, previousValue, resolvedValue: value, message, source: 'normalize' });
+    }
+  };
 
-  // Minify needs a bundler.
-  if (cfg.bundler === 'none') cfg.minify = false;
-  // Coverage only makes sense with a test runner that supports it.
-  if (cfg.test === 'none' || cfg.test === 'node') cfg.coverage = false;
-  // Codecov workflow implies coverage.
-  if (cfg.workflows.includes('codecov')) cfg.coverage = true;
-  // npm-publish + changesets are complementary; nothing to coerce, just noted.
+  // A target is required; default it if missing.
+  if (!Array.isArray(cfg.target) || cfg.target.length === 0) {
+    coerce('target', ['library'], 'TARGET_DEFAULTED', 'No target was given, so "library" was used.', 'info');
+  }
+  if (!Array.isArray(cfg.workflows)) coerce('workflows', [], 'WORKFLOWS_DEFAULTED', 'workflows was not a list, so it was reset to none.', 'info');
+
+  if (cfg.bundler === 'none') coerce('minify', false, 'MINIFY_REQUIRES_BUNDLER', 'Minify was disabled because no bundler produces output to minify.');
+  if (cfg.test === 'none' || cfg.test === 'node') coerce('coverage', false, 'COVERAGE_UNSUPPORTED_RUNNER', `Coverage was disabled because the "${cfg.test}" test runner does not report it.`);
+  if (cfg.workflows.includes('codecov')) coerce('coverage', true, 'COVERAGE_FORCED_BY_CODECOV', 'Coverage was enabled because the Codecov workflow requires it.', 'info');
 
   cfg.isReact = cfg.framework === 'react';
   cfg.isVue = cfg.framework === 'vue';
@@ -284,7 +305,7 @@ export function normalizeConfig(input = {}) {
   cfg.hasApp = cfg.target.includes('app');
   // A component-framework package that isn't an app is a library.
   if (cfg.hasFramework && !cfg.hasApp && !cfg.target.includes('library')) {
-    cfg.target = ['library', ...cfg.target];
+    coerce('target', ['library', ...cfg.target], 'TARGET_LIBRARY_ADDED', 'A "library" target was added because a component framework needs something to build.', 'info');
   }
 
   cfg.isTs = cfg.language === 'ts';
@@ -306,31 +327,31 @@ export function normalizeConfig(input = {}) {
   cfg.hasBuild = cfg.viteBuild || (!cfg.svelteLib && (cfg.bundler !== 'none' || cfg.isTs));
 
   // Apps aren't published packages.
-  if (cfg.hasApp) cfg.moduleFormat = 'esm';
+  if (cfg.hasApp) coerce('moduleFormat', 'esm', 'MODULE_FORMAT_FORCED_FOR_APP', 'An app is bundled, not published, so its module format is ESM.', 'info');
   cfg.hasEsm = cfg.moduleFormat === 'esm' || cfg.moduleFormat === 'dual';
   cfg.hasCjs = cfg.moduleFormat === 'cjs' || cfg.moduleFormat === 'dual';
 
   // Storybook only applies to component libraries.
-  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
+  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) coerce('storybook', false, 'STORYBOOK_REQUIRES_COMPONENT_LIBRARY', 'Storybook was disabled because it only applies to a component library.');
 
   // Playwright E2E only applies to app targets.
-  if (!cfg.hasApp) cfg.e2e = false;
+  if (!cfg.hasApp) coerce('e2e', false, 'E2E_REQUIRES_APP', 'End-to-end tests were disabled because they only apply to an app target.');
 
   // A monorepo is its own generation path (see buildMonorepo); it has a build.
   if (cfg.monorepo) cfg.hasBuild = true;
 
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
   // Package-correctness checks only make sense for a publishable package.
-  if (!cfg.publishable) cfg.pkgChecks = false;
+  if (!cfg.publishable) coerce('pkgChecks', false, 'PKG_CHECKS_REQUIRES_PUBLISHABLE', 'Package-correctness checks were disabled because this project is not published to npm.');
   // Sourcemaps + shipped source only matter for a published package.
-  if (!cfg.publishable) cfg.sourcemaps = false;
+  if (!cfg.publishable) coerce('sourcemaps', false, 'SOURCEMAPS_REQUIRES_PUBLISHABLE', 'Sourcemaps were disabled because this project is not published to npm.');
   // A bundle-size budget needs a published package with a built entry.
-  if (!(cfg.publishable && cfg.hasBuild)) cfg.sizeLimit = false;
+  if (!(cfg.publishable && cfg.hasBuild)) coerce('sizeLimit', false, 'SIZE_LIMIT_REQUIRES_BUILT_LIBRARY', 'The bundle-size budget was disabled because it needs a published package with a build.');
   // Env validation is for server-side runtimes (services / CLIs), not libs/apps.
-  if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
+  if (!(cfg.hasService || cfg.hasCli)) coerce('env', false, 'ENV_REQUIRES_SERVICE_OR_CLI', 'Env validation was disabled because it only applies to a service or CLI.');
   // Canary snapshots ride on the Changesets flow.
-  if (cfg.release !== 'changesets') cfg.canary = false;
+  if (cfg.release !== 'changesets') coerce('canary', false, 'CANARY_REQUIRES_CHANGESETS', 'Canary releases were disabled because they require the Changesets release flow.');
   // JSR is TypeScript-first, ESM, and for plain (non-framework) libraries.
-  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
+  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) coerce('jsr', false, 'JSR_REQUIRES_PLAIN_TS_LIBRARY', 'JSR publishing was disabled because it applies only to a plain TypeScript library.');
   return cfg;
 }
