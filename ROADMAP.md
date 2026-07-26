@@ -114,7 +114,7 @@ _Second external review, this one of the codebase rather than the experience. Ra
 
 ### The strategic one
 
-- [ ] **`packkit upgrade`** — read `packkit.json`, generate the current recommended output in memory, diff it against the repo, and classify each difference: safe auto-update, user-modified, deprecated dependency, changed best practice, manual migration. Then emit a patch or a PR. **Both reviews independently landed on this**, and 2.9's provenance file was the prerequisite. It's what turns a one-time generator into something with a durable relationship to the repos it creates — one-time scaffolders are easy to replace; a tool that keeps repos current isn't.
+- [x] ~~**`packkit upgrade`**~~ — **Shipped (3.1).** `npx create-packkit upgrade [dir]` reads `packkit.json`, regenerates the current recommended output in memory (faithful reconstruction verified across every preset type), and diffs it against disk. Classifies each difference — new files, added/bumped dependencies, new/changed scripts, files that differ — and `--apply` brings in the safe changes while preserving the user's own files, deps, and scripts; edited files are surfaced for review and never overwritten without `--force`. Pure planner (`planUpgrade` / `buildUpgradeWrite`) lives in the embedded API and is fully tested. **Both reviews independently landed on this**, and 2.9's provenance file was the prerequisite. Turns a one-time generator into something with a durable relationship to the repos it creates. _(Follow-up: per-file baseline hashes in packkit.json would let it distinguish "user edited" from "template changed" precisely, rather than surfacing all differing files for review.)_
 
 ### Checked and not acted on
 

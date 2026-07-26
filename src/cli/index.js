@@ -39,6 +39,7 @@ packkit — scaffold a modern npm package, CLI, service, or app
 Usage:
   npm create packkit@latest [name] [options]
   npx packkit [preset] [name] [options]
+  npx packkit upgrade [dir]                Pull a scaffolded project up to current templates
 
 Run with no options for an interactive wizard, or add -y for recommended
 defaults in one shot. Every option is documented (with why-you'd-use-it) at:
@@ -114,6 +115,13 @@ Examples:
 `;
 
 export async function run(argv = process.argv.slice(2)) {
+  // Subcommands take the first positional. `upgrade` is a distinct flow (it
+  // reads an existing project rather than scaffolding one), so route it early.
+  if (argv[0] === 'upgrade') {
+    const { runUpgrade } = await import('./upgrade.js');
+    return runUpgrade(argv.slice(1));
+  }
+
   const args = parseCliArgs(argv);
   if (args.help) return void console.log(HELP);
   if (args.version) return void console.log(pkgVersion());

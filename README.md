@@ -61,6 +61,22 @@ npx create-packkit ts-lib my-lib --here --merge
 
 **Existing files are never overwritten.** Anything that collides is left alone and reported, so you can diff at your leisure. (A directory containing only `.git` counts as empty — a fresh clone scaffolds without needing `--merge` at all.)
 
+## Keep a project current
+
+Every scaffolded project records what it came from in `packkit.json`. Later, from
+inside the project:
+
+```sh
+npx create-packkit upgrade          # dry run: what's changed since you scaffolded
+npx create-packkit upgrade --apply  # add new files, bump deps, keep your edits
+```
+
+Upgrade regenerates the project Packkit would produce today and reports the
+difference — new files, added or bumped dependencies, new scripts. `--apply`
+brings in the safe changes (your own files, deps, and scripts are preserved);
+files you've edited are listed for review and never overwritten unless you pass
+`--force`.
+
 ## Or configure it on the web
 
 No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx create-packkit` command). Everything runs in your browser.
