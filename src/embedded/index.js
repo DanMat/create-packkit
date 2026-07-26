@@ -11,8 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 import {
-  generate,
-  assemble,
+  generateTracked,
   normalizeConfig,
   resolvePreset,
   PRESETS,
@@ -27,16 +26,35 @@ import { deriveDeploymentContract } from './contract.js';
 export { deriveDeploymentContract };
 
 // Bumped when the shape of PackkitProjectDefinition changes incompatibly.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+// Resource ceilings for definitions loaded from untrusted stores (a database,
+// an upload, a queue). Generous enough for any real project, small enough to
+// refuse a hostile blob before it reaches the filesystem.
+const MAX_DEFINITION_FILES = 5000;
+const MAX_DEFINITION_BYTES = 50_000_000;
+
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Non-OPTIONS config keys the pipeline sets itself; not "unknown". */
 const KNOWN_EXTRA_KEYS = new Set(['preset', 'generatorVersion']);
 
-/** Thrown when a config cannot produce a valid project. Carries diagnostics. */
+// Fields where a host override silently changing an existing value is worth a
+// diagnostic (matches pkg-merge's protected set + dependency maps).
+const PROTECTED_PKG_FIELDS = new Set(['scripts', 'exports', 'bin', 'main', 'module', 'types', 'files', 'engines', 'packageManager']);
+const DEP_MAPS = new Set(['dependencies', 'devDependencies', 'peerDependencies']);
+
+// Replay state lives off to the side, keyed by the project object, so the
+// public GeneratedProject stays clean (no leaking `_extensions`), immutable to
+// consumers, and never accidentally serialized into logs or API responses.
+const extensionState = new WeakMap();
+
+/** Thrown when a config or definition cannot produce a valid project. */
 export class PackkitValidationError extends Error {
   constructor(message, diagnostics) {
     super(message);
     this.name = 'PackkitValidationError';
+    this.code = 'PACKKIT_VALIDATION_FAILED';
     this.diagnostics = diagnostics;
   }
 }
@@ -61,21 +79,16 @@ function packkitVersion() {
 export function createProject(input = {}) {
   if (!input || typeof input !== 'object') throw new TypeError('createProject expects an input object.');
 
-  // Preset first, then explicit overrides, matching the CLI's precedence.
   const merged = { ...(input.config || {}), ...(input.overrides || {}) };
   if (input.name != null) merged.name = input.name;
 
-  const preErrors = validateInput(input.preset, merged);
+  const preErrors = validateInput(merged);
   if (preErrors.length) {
     throw new PackkitValidationError('The configuration is not valid; see error.diagnostics.', preErrors);
   }
 
   const diagnostics = [...unknownOptionDiagnostics(merged)];
 
-  // Spread the preset under the overrides, then normalize ONCE with the
-  // collector. Normalizing the raw values (rather than an already-normalized
-  // seed) is what lets a coercion like "storybook off for a service" be
-  // observed — a second pass would see the value already settled and stay quiet.
   let canonicalPreset;
   if (input.preset) {
     canonicalPreset = resolvePreset(input.preset);
@@ -85,14 +98,16 @@ export function createProject(input = {}) {
       ]);
     }
   }
-  const raw = canonicalPreset ? { ...PRESETS[canonicalPreset], ...merged } : merged;
-  const config = normalizeConfig({ ...raw, generatorVersion: packkitVersion() }, diagnostics);
-  if (canonicalPreset) config.preset = canonicalPreset;
+  // Normalize ONCE, with the collector, over the raw preset+overrides — a second
+  // pass would see values already settled and report nothing. The preset is
+  // folded into `raw` (not set afterwards) so it reaches provenance during this
+  // pass; otherwise a replayed definition, whose config carries the preset, would
+  // bake it into packkit.json while the original did not — and the digests diverge.
+  const raw = canonicalPreset
+    ? { ...PRESETS[canonicalPreset], ...merged, preset: canonicalPreset }
+    : merged;
+  const { config, files, summary, fileSources, fragments } = generateTracked({ ...raw, generatorVersion: packkitVersion() }, diagnostics);
 
-  // generate() is the single source of truth for the actual bytes; assemble()
-  // gives us provenance to detect conflicts without changing that output.
-  const { files, summary } = generate(config);
-  const { fileSources, fragments } = assemble(config);
   for (const [path, sources] of Object.entries(fileSources)) {
     if (sources.length > 1) {
       diagnostics.push({
@@ -106,27 +121,21 @@ export function createProject(input = {}) {
   }
   diagnostics.push(...analyzePkgFragments(fragments).diagnostics);
 
-  return {
+  return finish({
     config,
     files,
     summary,
     diagnostics,
-    metadata: {
-      packkitVersion: packkitVersion(),
-      schemaVersion: SCHEMA_VERSION,
-      preset: config.preset,
-    },
+    metadata: { packkitVersion: packkitVersion(), schemaVersion: SCHEMA_VERSION, preset: config.preset },
     deploymentContract: deriveDeploymentContract(config),
-    // Internal: what the host layered on, so exportProjectDefinition can replay
-    // it. Not part of the documented contract.
-    _extensions: { files: {}, packageJson: {} },
-  };
+  }, { files: {}, packageJson: {} });
 }
 
 /**
  * Return a NEW project with the extension's files and package.json fields
- * layered on. Never mutates `project`. Extension file paths are validated;
- * collisions with existing files follow collisionPolicy (default 'error').
+ * layered on. Never mutates `project`. Extension file paths and contents are
+ * validated; collisions with existing files follow collisionPolicy ('error'
+ * by default), and host overrides of existing package fields are reported.
  */
 export function extendProject(project, extension = {}) {
   assertProject(project);
@@ -139,88 +148,95 @@ export function extendProject(project, extension = {}) {
   const diagnostics = [...project.diagnostics];
   const extFiles = extension.files || {};
 
-  // Case-insensitive collisions *within* the extension are always fatal — a
-  // policy can't sensibly pick a winner between two files the host meant to be
-  // distinct.
+  // Validate paths AND content up front: an invalid path or a non-string value
+  // anywhere means the whole extension is rejected, not half-applied.
   const { diagnostics: pathDiag } = validatePathMap(extFiles);
-  const fatal = pathDiag.filter((d) => d.severity === 'error');
+  const fatal = [...pathDiag.filter((d) => d.severity === 'error')];
+  for (const [path, contents] of Object.entries(extFiles)) {
+    if (typeof contents !== 'string') {
+      fatal.push({ severity: 'error', code: 'INVALID_FILE_CONTENT', field: path, message: `Contents of "${path}" must be a string.`, source: 'extend' });
+    }
+  }
   if (fatal.length) throw new PackkitValidationError('Extension files are not valid; see error.diagnostics.', fatal);
 
-  const appliedFiles = {};
+  const prevState = extensionState.get(project) || { files: {}, packageJson: {} };
+  const stateFiles = { ...prevState.files };
+
   for (const [path, contents] of Object.entries(extFiles)) {
-    const res = validateRelativePath(path);
-    const target = res.normalized;
-    if (target in files) {
+    const target = validateRelativePath(path).normalized;
+    const collides = target in files;
+    if (collides) {
       if (policy === 'error') {
         throw new PackkitValidationError(`Extension file "${path}" collides with a generated file.`, [
           { severity: 'error', code: 'EXTENSION_FILE_COLLISION', field: path, message: `"${path}" already exists in the generated project.`, source: 'extend' },
         ]);
       }
-      if (policy === 'skip') {
-        diagnostics.push({ severity: 'info', code: 'EXTENSION_FILE_SKIPPED', field: path, message: `"${path}" was kept from the generated project; the extension copy was skipped.`, source: 'extend' });
-        continue;
-      }
-      diagnostics.push({ severity: 'info', code: 'EXTENSION_FILE_OVERWRITTEN', field: path, message: `"${path}" was replaced by the extension.`, source: 'extend' });
+      diagnostics.push({
+        severity: 'info',
+        code: policy === 'skip' ? 'EXTENSION_FILE_SKIPPED' : 'EXTENSION_FILE_OVERWRITTEN',
+        field: path,
+        message: policy === 'skip' ? `"${path}" was kept from the generated project.` : `"${path}" was replaced by the extension.`,
+        source: 'extend',
+      });
+      if (policy === 'skip') continue;
     }
     files[target] = contents;
-    appliedFiles[target] = contents;
+    // "add" = the host introduced a path Packkit didn't generate; "replace" =
+    // deliberately overriding generated output. Recorded so a stored definition
+    // can tell, on replay under a newer Packkit, whether an add now collides
+    // with a file that version started generating.
+    stateFiles[target] = { content: contents, mode: collides ? 'replace' : 'add' };
   }
 
-  // package.json overrides: the host owns them, so they win on conflict, but
-  // the merge is deep so a host adding one script doesn't drop the rest.
-  let packageJson = project._extensions.packageJson;
+  let packageJson = prevState.packageJson;
   if (extension.packageJson && Object.keys(extension.packageJson).length) {
     const current = JSON.parse(files['package.json']);
+    diagnostics.push(...extensionPackageDiagnostics(current, extension.packageJson));
     const mergedPkg = finalizePackageJson(deepMerge(current, extension.packageJson));
     files['package.json'] = toJson(mergedPkg);
+    // Keep the raw override for definition export, minus prototype-poisoning keys.
     packageJson = deepMerge(packageJson, extension.packageJson);
   }
 
-  return {
-    ...project,
+  return finish({
+    config: project.config,
     files,
-    diagnostics,
     summary: { ...project.summary, fileCount: Object.keys(files).length },
+    diagnostics,
     metadata: { ...project.metadata, ...(extension.metadata ? { extension: extension.metadata } : {}) },
-    _extensions: {
-      files: { ...project._extensions.files, ...appliedFiles },
-      packageJson,
-    },
-  };
+    deploymentContract: project.deploymentContract,
+  }, { files: stateFiles, packageJson });
 }
 
 /**
  * A serializable definition that reproduces this project later. Contains no
- * secrets and no absolute paths — just the config, preset, and the extension
- * material the host layered on.
+ * secrets and no absolute paths — the config, preset, and the extension
+ * material the host layered on (each file tagged add/replace).
  */
 export function exportProjectDefinition(project) {
   assertProject(project);
+  const state = extensionState.get(project) || { files: {}, packageJson: {} };
   return {
     schemaVersion: SCHEMA_VERSION,
     packkitVersion: project.metadata.packkitVersion,
     preset: project.metadata.preset,
     config: serializableConfig(project.config),
     extensions: {
-      files: { ...project._extensions.files },
-      packageJson: { ...project._extensions.packageJson },
+      files: Object.fromEntries(Object.entries(state.files).map(([p, e]) => [p, { content: e.content, mode: e.mode }])),
+      packageJson: { ...state.packageJson },
     },
   };
 }
 
 /** Rebuild a project from a stored definition, re-applying its extensions. */
 export function createProjectFromDefinition(definition) {
-  if (!definition || typeof definition !== 'object') throw new TypeError('A definition object is required.');
-  if (definition.schemaVersion !== SCHEMA_VERSION) {
-    throw new PackkitValidationError(
-      `Definition schemaVersion ${definition.schemaVersion} is not supported by this Packkit (expected ${SCHEMA_VERSION}).`,
-      [{ severity: 'error', code: 'SCHEMA_VERSION_MISMATCH', field: 'schemaVersion', message: 'Unsupported definition schema version.', source: 'definition' }],
-    );
-  }
+  validateDefinition(definition);
   const current = packkitVersion();
   const base = createProject({ preset: definition.preset, config: definition.config });
+
+  const drift = [];
   if (definition.packkitVersion && definition.packkitVersion !== current) {
-    base.diagnostics.push({
+    drift.push({
       severity: 'warning',
       code: 'PACKKIT_VERSION_DRIFT',
       field: 'packkitVersion',
@@ -230,11 +246,34 @@ export function createProjectFromDefinition(definition) {
       resolvedValue: current,
     });
   }
+
   const ext = definition.extensions || {};
-  if ((ext.files && Object.keys(ext.files).length) || (ext.packageJson && Object.keys(ext.packageJson).length)) {
-    return extendProject(base, { files: ext.files || {}, packageJson: ext.packageJson || {}, collisionPolicy: 'overwrite' });
+  const extFiles = ext.files || {};
+  const plainFiles = {};
+  for (const [path, entry] of Object.entries(extFiles)) {
+    const { content, mode } = normalizeDefinitionFile(entry);
+    plainFiles[path] = content;
+    // A file the host originally *added* now collides with something this
+    // Packkit version generates: surface it loudly instead of silently taking
+    // the stored copy. The definition still reproduces (the host file wins, as
+    // it did originally), but the drift is now visible for reconciliation.
+    if (mode === 'add' && base.files[path] !== undefined) {
+      drift.push({
+        severity: 'error',
+        code: 'EXTENSION_ADD_COLLIDES_WITH_NEW_BASE',
+        field: path,
+        message: `"${path}" was originally added by the host, but Packkit ${current} now generates it too. The stored copy was used; review the difference.`,
+        source: 'definition',
+      });
+    }
   }
-  return base;
+
+  const hasExt = Object.keys(plainFiles).length || Object.keys(ext.packageJson || {}).length;
+  const result = hasExt
+    ? extendProject(base, { files: plainFiles, packageJson: ext.packageJson || {}, collisionPolicy: 'overwrite' })
+    : base;
+  result.diagnostics.push(...drift);
+  return result;
 }
 
 /**
@@ -256,14 +295,17 @@ export function calculateProjectDigest(project) {
 
 // ---- internals -------------------------------------------------------------
 
+function finish(project, state) {
+  extensionState.set(project, state);
+  return project;
+}
+
 function assertProject(project) {
   if (!project || typeof project !== 'object' || !project.files || !project.config) {
     throw new TypeError('Expected a GeneratedProject from createProject().');
   }
 }
 
-// Only the fields that were inputs — drop the derived helper flags (isTs,
-// hasApp…) so the serialized config is stable and re-normalizes to itself.
 function serializableConfig(config) {
   const out = {};
   for (const key of Object.keys(OPTIONS)) {
@@ -277,15 +319,14 @@ function sortObject(obj) {
   return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
 }
 
-// Fatal, generation-preventing problems: bad types and out-of-range enum values.
-function validateInput(preset, config) {
+function validateInput(config) {
   const errors = [];
   if (config.name != null && (typeof config.name !== 'string' || config.name.trim() === '')) {
     errors.push({ severity: 'error', code: 'INVALID_NAME', field: 'name', message: 'name must be a non-empty string.', source: 'validate' });
   }
   for (const [key, value] of Object.entries(config)) {
     const opt = OPTIONS[key];
-    if (!opt) continue; // unknown keys are a warning, handled elsewhere
+    if (!opt) continue;
     if (opt.type === 'boolean' && typeof value !== 'boolean') {
       errors.push(valueError(key, value, 'must be true or false'));
     } else if (opt.choices) {
@@ -310,4 +351,89 @@ function unknownOptionDiagnostics(config) {
     out.push({ severity: 'warning', code: 'UNKNOWN_OPTION', field: key, message: `"${key}" is not a Packkit option and was ignored.`, source: 'validate' });
   }
   return out;
+}
+
+// Report host package overrides that change an existing generated value, so the
+// host still wins but the change is visible (it can invalidate the deployment
+// contract — e.g. redefining scripts.build).
+function extensionPackageDiagnostics(current, override) {
+  const out = [];
+  for (const [topKey, value] of Object.entries(override)) {
+    if (DEP_MAPS.has(topKey) && current[topKey]) {
+      for (const [dep, version] of Object.entries(value || {})) {
+        const prev = current[topKey][dep];
+        if (prev !== undefined && prev !== version) {
+          out.push({ severity: 'warning', code: 'EXTENSION_DEPENDENCY_VERSION_OVERRIDE', field: `${topKey}.${dep}`, message: `The extension changed ${topKey}.${dep} from ${prev} to ${version}.`, source: 'extend', previousValue: prev, resolvedValue: version });
+        }
+      }
+    } else if (PROTECTED_PKG_FIELDS.has(topKey) && current[topKey] !== undefined) {
+      if (value && typeof value === 'object' && !Array.isArray(value) && typeof current[topKey] === 'object') {
+        for (const [k, v] of Object.entries(value)) {
+          const prev = current[topKey][k];
+          if (prev !== undefined && JSON.stringify(prev) !== JSON.stringify(v)) {
+            out.push({ severity: 'warning', code: 'EXTENSION_PACKAGE_FIELD_OVERRIDE', field: `${topKey}.${k}`, message: `The extension changed ${topKey}.${k}.`, source: 'extend', previousValue: prev, resolvedValue: v });
+          }
+        }
+      } else if (JSON.stringify(current[topKey]) !== JSON.stringify(value)) {
+        out.push({ severity: 'warning', code: 'EXTENSION_PACKAGE_FIELD_OVERRIDE', field: topKey, message: `The extension changed ${topKey}.`, source: 'extend', previousValue: current[topKey], resolvedValue: value });
+      }
+    }
+  }
+  return out;
+}
+
+function normalizeDefinitionFile(entry) {
+  // v2 stores { content, mode }; tolerate a bare string (mode unknown → treat as
+  // a deliberate replace so it never falsely reports an add-collision).
+  if (typeof entry === 'string') return { content: entry, mode: 'replace' };
+  return { content: entry.content, mode: entry.mode === 'add' ? 'add' : 'replace' };
+}
+
+// Definitions can arrive from untrusted stores, so validate structure, guard
+// against prototype-pollution keys, cap resource use, and re-check every path
+// before any of it can reach generation or disk.
+function validateDefinition(definition) {
+  const errs = [];
+  const fail = (code, message, field) => errs.push({ severity: 'error', code, message, field, source: 'definition' });
+
+  if (!isPlainObject(definition)) throw new PackkitValidationError('A definition object is required.', [{ severity: 'error', code: 'INVALID_DEFINITION', message: 'Definition must be a plain object.', source: 'definition' }]);
+  if (definition.schemaVersion !== SCHEMA_VERSION) fail('SCHEMA_VERSION_MISMATCH', `Definition schemaVersion ${definition.schemaVersion} is not supported (expected ${SCHEMA_VERSION}).`, 'schemaVersion');
+  if (definition.config !== undefined && !isPlainObject(definition.config)) fail('INVALID_DEFINITION', 'config must be a plain object.', 'config');
+  if (definition.config) assertNoUnsafeKeys(definition.config, 'config', fail);
+
+  const ext = definition.extensions;
+  if (ext !== undefined) {
+    if (!isPlainObject(ext)) fail('INVALID_DEFINITION', 'extensions must be a plain object.', 'extensions');
+    else {
+      const files = ext.files || {};
+      if (!isPlainObject(files)) fail('INVALID_DEFINITION', 'extensions.files must be an object.', 'extensions.files');
+      else {
+        const paths = Object.keys(files);
+        if (paths.length > MAX_DEFINITION_FILES) fail('DEFINITION_TOO_LARGE', `Definition has ${paths.length} files (max ${MAX_DEFINITION_FILES}).`, 'extensions.files');
+        let total = 0;
+        for (const [p, entry] of Object.entries(files)) {
+          const content = typeof entry === 'string' ? entry : entry && entry.content;
+          if (typeof content !== 'string') fail('INVALID_FILE_CONTENT', `extensions.files["${p}"] must have string content.`, p);
+          else total += content.length;
+        }
+        if (total > MAX_DEFINITION_BYTES) fail('DEFINITION_TOO_LARGE', `Definition content is ${total} bytes (max ${MAX_DEFINITION_BYTES}).`, 'extensions.files');
+        for (const d of validatePathMap(Object.fromEntries(paths.map((p) => [p, '']))).diagnostics) errs.push({ ...d, source: 'definition' });
+      }
+      if (ext.packageJson !== undefined && !isPlainObject(ext.packageJson)) fail('INVALID_DEFINITION', 'extensions.packageJson must be an object.', 'extensions.packageJson');
+      if (isPlainObject(ext.packageJson)) assertNoUnsafeKeys(ext.packageJson, 'extensions.packageJson', fail);
+    }
+  }
+
+  if (errs.length) throw new PackkitValidationError('The project definition is not valid; see error.diagnostics.', errs);
+}
+
+function assertNoUnsafeKeys(obj, path, fail) {
+  for (const key of Object.keys(obj)) {
+    if (UNSAFE_KEYS.has(key)) fail('UNSAFE_KEY', `"${path}.${key}" is not an allowed key.`, `${path}.${key}`);
+    else if (isPlainObject(obj[key])) assertNoUnsafeKeys(obj[key], `${path}.${key}`, fail);
+  }
+}
+
+function isPlainObject(v) {
+  return v != null && typeof v === 'object' && !Array.isArray(v);
 }

@@ -8,7 +8,7 @@
 
 // Fields where two contributors setting the *same leaf* to *different values*
 // is a real conflict a host should hear about. Dependency maps are handled
-// separately (version-aware); everything else deep-merges additively.
+// separately (version-aware, per section); everything else deep-merges.
 const PROTECTED = new Set(['scripts', 'exports', 'bin', 'main', 'module', 'types', 'files', 'engines', 'packageManager']);
 const DEP_MAPS = new Set(['dependencies', 'devDependencies', 'peerDependencies']);
 
@@ -16,50 +16,52 @@ const DEP_MAPS = new Set(['dependencies', 'devDependencies', 'peerDependencies']
  * Analyze an ordered list of { source, pkg } fragments.
  * Returns { diagnostics } describing every protected-field leaf that two
  * sources set to conflicting values, and every dependency pinned to two
- * different versions. Does not produce package.json — the core owns that.
+ * different versions *within the same section*. Does not produce package.json.
  */
 export function analyzePkgFragments(fragments) {
   const diagnostics = [];
-  // leaf path ("scripts.build") -> { value, source }
-  const leaves = new Map();
-  // dependency name -> { version, source, mapKey }
+  const leaves = new Map(); // rendered leaf path -> { value, source }
+  // Keyed by section + name, so `dependencies.react` and `peerDependencies.react`
+  // are distinct — differing versions across those sections is normal, not a bug.
   const deps = new Map();
 
   for (const { source, pkg } of fragments) {
     for (const [topKey, value] of Object.entries(pkg)) {
       if (DEP_MAPS.has(topKey)) {
         for (const [dep, version] of Object.entries(value || {})) {
-          const prev = deps.get(dep);
+          const key = `${topKey}:${dep}`;
+          const prev = deps.get(key);
           if (prev && prev.version !== version) {
             diagnostics.push({
               severity: 'warning',
               code: 'DEPENDENCY_VERSION_CONFLICT',
               field: `${topKey}.${dep}`,
-              message: `"${dep}" is requested at ${prev.version} (by ${prev.source}) and ${version} (by ${source}).`,
+              message: `"${dep}" in ${topKey} is requested at ${prev.version} (by ${prev.source}) and ${version} (by ${source}).`,
               source: 'package-merge',
               previousValue: prev.version,
               resolvedValue: version,
             });
           }
-          deps.set(dep, { version, source, mapKey: topKey });
+          deps.set(key, { version, source });
         }
         continue;
       }
       if (PROTECTED.has(topKey)) {
-        collectLeaves(topKey, value, (leaf, leafValue) => {
-          const prev = leaves.get(leaf);
+        collectLeaves([topKey], value, (segments, leafValue) => {
+          const rendered = renderPath(segments);
+          const prev = leaves.get(rendered);
           if (prev && JSON.stringify(prev.value) !== JSON.stringify(leafValue)) {
             diagnostics.push({
               severity: 'warning',
               code: 'PACKAGE_FIELD_CONFLICT',
-              field: leaf,
-              message: `"${leaf}" is set to different values by ${prev.source} and ${source}; the later one wins.`,
+              field: rendered,
+              message: `"${rendered}" is set to different values by ${prev.source} and ${source}; the later one wins.`,
               source: 'package-merge',
               previousValue: prev.value,
               resolvedValue: leafValue,
             });
           }
-          leaves.set(leaf, { value: leafValue, source });
+          leaves.set(rendered, { value: leafValue, source });
         });
       }
     }
@@ -67,12 +69,21 @@ export function analyzePkgFragments(fragments) {
   return { diagnostics };
 }
 
-// Flatten one protected field into leaf paths. `scripts.build`, `exports['.']`,
-// or the whole value for a scalar field like `main`.
-function collectLeaves(topKey, value, emit) {
+// Recursively flatten a protected field to its leaf values, carrying the key
+// path as an array so a key that itself contains a dot (e.g. exports './sub.js')
+// isn't mistaken for two segments.
+function collectLeaves(segments, value, emit) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    for (const [k, v] of Object.entries(value)) emit(`${topKey}.${k}`, v);
+    for (const [k, v] of Object.entries(value)) collectLeaves([...segments, k], v, emit);
   } else {
-    emit(topKey, value);
+    emit(segments, value);
   }
+}
+
+// Render a segment path for human-facing diagnostics. Dotted segments get
+// bracket notation so the field reads unambiguously.
+function renderPath(segments) {
+  return segments
+    .map((s, i) => (i > 0 && s.includes('.') ? `['${s}']` : i > 0 ? `.${s}` : s))
+    .join('');
 }

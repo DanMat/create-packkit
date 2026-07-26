@@ -17,6 +17,9 @@ export interface WriteResult {
 
 export class PackkitWriteError extends Error {
   code: string;
+  path?: string;
+  destination?: string;
+  cause?: unknown;
 }
 
 export function writeGeneratedProject(input: WriteGeneratedProjectInput): Promise<WriteResult>;

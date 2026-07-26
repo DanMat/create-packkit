@@ -139,7 +139,7 @@ test('definition carries no absolute paths or secrets, only config + extensions'
   const def = exportProjectDefinition(p);
   const json = JSON.stringify(def);
   assert.doesNotMatch(json, /\/(Users|home|tmp|var)\//, 'no machine paths');
-  assert.equal(def.extensions.files['x.txt'], 'hi');
+  assert.deepEqual(def.extensions.files['x.txt'], { content: 'hi', mode: 'add' });
 });
 
 test('a definition from an incompatible schema version is rejected', () => {
@@ -223,4 +223,131 @@ test('writeGeneratedProject: does not install, init git, or run commands', async
   await writeGeneratedProject({ project: p, destination: dir });
   await assert.rejects(() => stat(join(dir, 'node_modules')), 'no install');
   await assert.rejects(() => stat(join(dir, '.git')), 'no git init');
+});
+
+// ---- review fixes: security & correctness ----------------------------------
+
+test('writer: refuses to write through a symlinked directory component', async () => {
+  const { symlink, mkdir: mkdirp } = await import('node:fs/promises');
+  const dir = await tmp();
+  const outside = await tmp();
+  await mkdirp(join(outside, 'real'));
+  await symlink(join(outside, 'real'), join(dir, 'link'));
+  await assert.rejects(
+    () => writeGeneratedProject({ project: { config: {}, files: { 'link/escaped.txt': 'x' } }, destination: dir }),
+    (e) => e instanceof PackkitWriteError && e.code === 'SYMLINK_PATH',
+  );
+});
+
+test('writer: rejects a symlinked destination itself', async () => {
+  const { symlink } = await import('node:fs/promises');
+  const dir = await tmp();
+  const outside = await tmp();
+  const linkDest = join(dir, 'dest');
+  await symlink(outside, linkDest);
+  await assert.rejects(
+    () => writeGeneratedProject({ project: { config: {}, files: { 'a.txt': 'x' } }, destination: linkDest }),
+    (e) => e instanceof PackkitWriteError && e.code === 'SYMLINK_PATH',
+  );
+});
+
+test('writer: error policy preflights all collisions, writes nothing', async () => {
+  const dir = await tmp();
+  await writeFile(join(dir, 'a.txt'), 'existing');
+  const project = { config: {}, files: { 'a.txt': 'new', 'b.txt': 'new' } };
+  await assert.rejects(
+    () => writeGeneratedProject({ project, destination: dir, collisionPolicy: 'error' }),
+    (e) => e instanceof PackkitWriteError && e.code === 'FILE_EXISTS' && e.message.includes('a.txt'),
+  );
+  // b.txt must NOT have been written — the collision aborts before any write.
+  await assert.rejects(() => stat(join(dir, 'b.txt')));
+});
+
+test('writer errors carry structured properties', async () => {
+  const dir = await tmp();
+  const err = await writeGeneratedProject({ project: { config: {}, files: { '../x': 'y' } }, destination: dir }).catch((e) => e);
+  assert.equal(err.code, 'PATH_ESCAPE');
+  assert.equal(err.path, '../x');
+  assert.equal(err.destination, (await import('node:path')).resolve(dir));
+});
+
+test('definition replay flags an add that a newer base now generates', () => {
+  // Simulate: the host added a file that (pretend) Packkit now generates too.
+  const base = createProject({ preset: 'ts-lib', name: 'lib' });
+  const generatedPath = Object.keys(base.files)[0]; // any real generated path
+  const definition = {
+    schemaVersion: SCHEMA_VERSION,
+    packkitVersion: '0.0.1',
+    preset: 'ts-lib',
+    config: { name: 'lib', preset: 'ts-lib' },
+    extensions: { files: { [generatedPath]: { content: 'host-owned', mode: 'add' } }, packageJson: {} },
+  };
+  const result = createProjectFromDefinition(definition);
+  const drift = result.diagnostics.find((d) => d.code === 'EXTENSION_ADD_COLLIDES_WITH_NEW_BASE');
+  assert.ok(drift, 'collision surfaced');
+  assert.equal(drift.severity, 'error');
+  assert.equal(result.files[generatedPath], 'host-owned', 'stored copy still reproduced');
+});
+
+test('extendProject: host package overrides are reported', () => {
+  const base = createProject({ preset: 'node-service', name: 'svc' });
+  const ext = extendProject(base, { packageJson: { scripts: { start: 'my-custom-start' } } });
+  const d = ext.diagnostics.find((x) => x.code === 'EXTENSION_PACKAGE_FIELD_OVERRIDE' && x.field === 'scripts.start');
+  assert.ok(d, 'override reported');
+  assert.equal(d.resolvedValue, 'my-custom-start');
+});
+
+test('extendProject: non-string file content is rejected', () => {
+  const base = createProject({ preset: 'ts-lib', name: 'lib' });
+  assert.throws(
+    () => extendProject(base, { files: { 'x.txt': { not: 'a string' } } }),
+    (e) => e instanceof PackkitValidationError && e.diagnostics[0].code === 'INVALID_FILE_CONTENT',
+  );
+});
+
+test('dependency conflicts are keyed per section, not across them', async () => {
+  const { analyzePkgFragments } = await import('../src/embedded/pkg-merge.js');
+  // Different sections with different version ranges is NOT a conflict.
+  const cross = analyzePkgFragments([
+    { source: 'a', pkg: { dependencies: { react: '^19' } } },
+    { source: 'b', pkg: { peerDependencies: { react: '>=18' } } },
+  ]).diagnostics;
+  assert.equal(cross.filter((d) => d.code === 'DEPENDENCY_VERSION_CONFLICT').length, 0);
+  // Two disagreeing versions in the SAME section IS a conflict.
+  const same = analyzePkgFragments([
+    { source: 'a', pkg: { dependencies: { react: '^18' } } },
+    { source: 'b', pkg: { dependencies: { react: '^19' } } },
+  ]).diagnostics;
+  assert.equal(same.filter((d) => d.code === 'DEPENDENCY_VERSION_CONFLICT').length, 1);
+});
+
+test('deepMerge cannot pollute the prototype via host extension keys', () => {
+  const base = createProject({ preset: 'ts-lib', name: 'lib' });
+  // __proto__ as an own key (JSON.parse) must not leak onto Object.prototype.
+  extendProject(base, { packageJson: JSON.parse('{"__proto__":{"polluted":true},"scripts":{"x":"1"}}') });
+  assert.equal({}.polluted, undefined, 'Object.prototype untouched');
+});
+
+test('createProjectFromDefinition: rejects unsafe keys and oversized definitions', () => {
+  assert.throws(
+    () => createProjectFromDefinition({ schemaVersion: SCHEMA_VERSION, packkitVersion: '1.0.0', config: JSON.parse('{"__proto__":{"x":1}}') }),
+    (e) => e instanceof PackkitValidationError && e.diagnostics.some((d) => d.code === 'UNSAFE_KEY'),
+  );
+  const many = Object.fromEntries(Array.from({ length: 5001 }, (_, i) => [`f${i}.txt`, { content: '', mode: 'add' }]));
+  assert.throws(
+    () => createProjectFromDefinition({ schemaVersion: SCHEMA_VERSION, packkitVersion: '1.0.0', config: {}, extensions: { files: many } }),
+    (e) => e instanceof PackkitValidationError && e.diagnostics.some((d) => d.code === 'DEFINITION_TOO_LARGE'),
+  );
+});
+
+test('deployment contract does not mark PORT required (it has a default)', () => {
+  const svc = createProject({ preset: 'node-service', name: 'svc', overrides: { env: true } }).deploymentContract;
+  assert.equal(svc.requiredEnvironmentVariables, undefined, 'PORT has a default, so not required');
+  assert.equal(svc.port, 3000);
+});
+
+test('the public project has no leaked internal extension state', () => {
+  const p = createProject({ preset: 'ts-lib', name: 'lib' });
+  assert.equal(p._extensions, undefined, 'no _extensions on the object');
+  assert.deepEqual(Object.keys(p).sort(), ['config', 'deploymentContract', 'diagnostics', 'files', 'metadata', 'summary']);
 });

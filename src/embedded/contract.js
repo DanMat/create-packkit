@@ -15,13 +15,17 @@ export function deriveDeploymentContract(cfg) {
   const start = cfg.packageManager === 'npm' ? 'npm start' : `${cfg.packageManager} start`;
 
   if (cfg.hasService) {
+    // The generated server reads PORT but defaults to 3000, so PORT is optional,
+    // not required — `port` communicates the default and the `PORT` env var
+    // overrides it. `healthCheckPath` is only asserted because every service
+    // framework Packkit generates (Hono/Fastify/Express) defines /health.
     return prune({
       type: 'node-service',
       buildCommand: cfg.hasBuild ? run('build') : undefined,
       startCommand: start,
       port: 3000,
       healthCheckPath: '/health',
-      requiredEnvironmentVariables: cfg.env ? ['PORT'] : [],
+      requiredEnvironmentVariables: [],
     });
   }
 

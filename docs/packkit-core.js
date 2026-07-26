@@ -356,6 +356,7 @@ function normalizeConfig(input = {}, diagnostics = null) {
 }
 
 // src/core/render.js
+var UNSAFE_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
 function deepMerge(target, source) {
   if (Array.isArray(target) && Array.isArray(source)) {
     return [.../* @__PURE__ */ new Set([...target, ...source])];
@@ -363,6 +364,7 @@ function deepMerge(target, source) {
   if (isPlainObject(target) && isPlainObject(source)) {
     const out = { ...target };
     for (const [k, v] of Object.entries(source)) {
+      if (UNSAFE_KEYS.has(k)) continue;
       out[k] = k in target ? deepMerge(target[k], v) : v;
     }
     return out;
@@ -3085,18 +3087,26 @@ function assemble(cfg) {
   }
   return { files, fileSources, fragments, pkg };
 }
-function generate(input) {
-  const cfg = normalizeConfig(input);
-  if (cfg.monorepo) return buildMonorepo(cfg);
-  const { files, pkg } = assemble(cfg);
+function generateTracked(input, diagnostics = null) {
+  const cfg = normalizeConfig(input, diagnostics);
+  if (cfg.monorepo) {
+    return { ...buildMonorepo(cfg), fileSources: {}, fragments: [] };
+  }
+  const { files, fileSources, fragments, pkg } = assemble(cfg);
   files["package.json"] = toJson(finalizePackageJson(pkg));
   files["packkit.json"] = provenance(cfg);
   return {
     config: cfg,
     files,
     postCommands: postCommands(cfg),
-    summary: summarize(cfg, files)
+    summary: summarize(cfg, files),
+    fileSources,
+    fragments
   };
+}
+function generate(input) {
+  const { config, files, postCommands: postCommands2, summary } = generateTracked(input);
+  return { config, files, postCommands: postCommands2, summary };
 }
 function postCommands(cfg) {
   const install = {
@@ -3138,6 +3148,7 @@ export {
   defaultConfig,
   fromPreset,
   generate,
+  generateTracked,
   normalizeConfig,
   resolvePreset
 };

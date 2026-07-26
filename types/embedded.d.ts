@@ -59,18 +59,26 @@ export interface ProjectExtension {
   collisionPolicy?: CollisionPolicy;
 }
 
+/** How a stored extension file relates to generated output: `add` = the host
+ *  introduced a new path; `replace` = it deliberately overrode a generated one. */
+export interface StoredExtensionFile {
+  content: string;
+  mode: 'add' | 'replace';
+}
+
 export interface PackkitProjectDefinition {
   schemaVersion: number;
   packkitVersion: string;
   preset?: string;
   config: PackkitConfig;
   extensions?: {
-    files?: Record<string, string>;
+    files?: Record<string, StoredExtensionFile>;
     packageJson?: Record<string, unknown>;
   };
 }
 
 export class PackkitValidationError extends Error {
+  readonly code: 'PACKKIT_VALIDATION_FAILED';
   diagnostics: Diagnostic[];
 }
 

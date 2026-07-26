@@ -9,6 +9,11 @@ export function render(template, vars = {}) {
   });
 }
 
+// Keys that would let a merged-in object reach an object's prototype. The
+// embedded API deep-merges host-supplied data (extension package.json), so
+// these are skipped defensively even though the merge is immutable.
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Deep-merge plain objects (arrays are concatenated + de-duped). Used to fold
  *  each feature's package.json fragment into the accumulator. */
 export function deepMerge(target, source) {
@@ -18,6 +23,7 @@ export function deepMerge(target, source) {
   if (isPlainObject(target) && isPlainObject(source)) {
     const out = { ...target };
     for (const [k, v] of Object.entries(source)) {
+      if (UNSAFE_KEYS.has(k)) continue;
       out[k] = k in target ? deepMerge(target[k], v) : v;
     }
     return out;
