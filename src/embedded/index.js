@@ -271,8 +271,19 @@ export function exportProjectDefinition(project) {
   };
 }
 
-/** Rebuild a project from a stored definition, re-applying its extensions. */
-export function createProjectFromDefinition(definition) {
+/**
+ * Rebuild a project from a stored definition, re-applying its extensions.
+ *
+ * If a file the host originally *added* now collides with one the current
+ * Packkit generates, that's surfaced as an error-severity diagnostic. With
+ * `driftPolicy: 'error'` that condition throws instead — for a caller that
+ * wants an unreconciled definition to fail loudly rather than reproduce
+ * silently. The default, `'report'`, returns the project with the diagnostic.
+ */
+export function createProjectFromDefinition(definition, { driftPolicy = 'report' } = {}) {
+  if (!['report', 'error'].includes(driftPolicy)) {
+    throw new TypeError(`Unknown driftPolicy "${driftPolicy}".`);
+  }
   validateDefinition(definition);
   const current = packkitVersion();
   const base = createProject({ preset: definition.preset, config: definition.config });
@@ -311,6 +322,14 @@ export function createProjectFromDefinition(definition) {
         source: 'definition',
       });
     }
+  }
+
+  // With driftPolicy: 'error', an unreconciled add-collision fails the rebuild
+  // rather than reproducing silently. Version drift alone (a warning) never
+  // throws — only the error-severity collision does.
+  const fatalDrift = drift.filter((d) => d.severity === 'error');
+  if (driftPolicy === 'error' && fatalDrift.length) {
+    throw new PackkitValidationError('The definition no longer reconciles with this Packkit version; see error.diagnostics.', fatalDrift);
   }
 
   const hasExt = Object.keys(plainFiles).length || Object.keys(ext.packageJson || {}).length;

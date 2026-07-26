@@ -392,3 +392,31 @@ test('createProjectFromResolvedConfig honors a field set after resolution (repo)
   const project = createProjectFromResolvedConfig(config, { diagnostics });
   assert.match(project.files['package.json'], /acme\/lib/);
 });
+
+test('driftPolicy: error throws on an add-collision; report returns it as a diagnostic', () => {
+  const base = createProject({ preset: 'ts-lib', name: 'lib' });
+  const generatedPath = Object.keys(base.files)[0];
+  const definition = {
+    schemaVersion: SCHEMA_VERSION,
+    packkitVersion: '0.0.1',
+    preset: 'ts-lib',
+    config: { name: 'lib', preset: 'ts-lib' },
+    extensions: { files: { [generatedPath]: { content: 'host-owned', mode: 'add' } }, packageJson: {} },
+  };
+  // default 'report' returns the project with an error diagnostic (no throw)
+  const reported = createProjectFromDefinition(definition);
+  assert.ok(reported.diagnostics.some((d) => d.code === 'EXTENSION_ADD_COLLIDES_WITH_NEW_BASE'));
+  // 'error' throws instead
+  assert.throws(
+    () => createProjectFromDefinition(definition, { driftPolicy: 'error' }),
+    (e) => e instanceof PackkitValidationError && e.diagnostics[0].code === 'EXTENSION_ADD_COLLIDES_WITH_NEW_BASE',
+  );
+});
+
+test('driftPolicy: error does NOT throw on a clean replay (version drift alone is fine)', () => {
+  const ext = extendProject(createProject({ preset: 'ts-lib', name: 'lib' }), { files: { 'novel.txt': 'x' } });
+  const def = { ...exportProjectDefinition(ext), packkitVersion: '0.0.1' }; // force a version-drift warning
+  const rec = createProjectFromDefinition(def, { driftPolicy: 'error' });
+  assert.ok(rec.diagnostics.some((d) => d.code === 'PACKKIT_VERSION_DRIFT'));
+  assert.ok(rec.files['novel.txt'] === 'x');
+});
