@@ -123,6 +123,20 @@ const recreated = createProjectFromDefinition(definition);
 Loading a definition validates its schema and warns if it was created with a
 different Packkit version (output may differ across versions).
 
+If a file the host originally *added* is now one that the current Packkit
+generates, that's reported as an error-severity diagnostic and the stored copy
+is used. To make that condition fail loudly instead:
+
+```js
+const recreated = createProjectFromDefinition(definition, { driftPolicy: 'error' });
+// throws PackkitValidationError when an added file now collides with generated output
+```
+
+The default, `driftPolicy: 'report'`, returns the project with the diagnostic so
+you can decide. A returned project may therefore carry error-severity
+diagnostics without `createProjectFromDefinition` having thrown — inspect
+`project.diagnostics` if you treat those as failures.
+
 ## Calculate a digest
 
 For change detection or caching, a digest over the normalized config and file
@@ -156,6 +170,24 @@ result.diagnostics;  // per-file write outcomes
 
 An invalid path anywhere in the project makes the whole write fail before
 anything is written, so you never get half-escaped output.
+
+### What the writer protects against, and what it doesn't
+
+The writer is safe against a **hostile file map** and **pre-existing symlinks**:
+absolute paths, `..` escapes, null bytes, and paths that resolve through an
+existing symbolic link (including the destination itself, and the final file
+component) are all rejected before anything is written.
+
+It is **not** race-proof against a concurrently malicious process. There is a
+window between the symlink/collision preflight and the `mkdir`/`writeFile`, so
+another process mutating the destination directory *at the same time* — swapping
+a checked directory for a symlink — could still redirect a write. Closing that
+would require atomic `openat`/`O_NOFOLLOW`-style writes.
+
+For the intended use — writing a freshly generated project into a private
+temporary workspace your application controls — this doesn't arise. If you're
+writing into a directory another process can mutate concurrently, treat that as
+outside the writer's guarantees.
 
 ## Stable vs internal
 

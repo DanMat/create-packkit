@@ -89,6 +89,9 @@ export function resolveProjectConfig(input?: CreateProjectInput): { config: Reso
 export function createProjectFromResolvedConfig(config: ResolvedPackkitConfig, options?: { diagnostics?: Diagnostic[] }): GeneratedProject;
 export function extendProject(project: GeneratedProject, extension?: ProjectExtension): GeneratedProject;
 export function exportProjectDefinition(project: GeneratedProject): PackkitProjectDefinition;
-export function createProjectFromDefinition(definition: PackkitProjectDefinition): GeneratedProject;
+export function createProjectFromDefinition(
+  definition: PackkitProjectDefinition,
+  options?: { driftPolicy?: 'report' | 'error' },
+): GeneratedProject;
 export function calculateProjectDigest(project: GeneratedProject): string;
 export function deriveDeploymentContract(config: ResolvedPackkitConfig): DeploymentContract;
