@@ -72,12 +72,18 @@ function packkitVersion() {
 }
 
 /**
- * Generate a complete project in memory. No files are written, nothing is
- * installed, no commands run. Returns a GeneratedProject with diagnostics.
+ * Resolve a preset + overrides into a complete, validated config, collecting
+ * the diagnostics normalization produced — without generating anything.
+ *
+ * Generation and resolution are split so a trusted caller (the CLI) can make
+ * decisions on the resolved config — a Node-floor check, creating the remote —
+ * and then generate, while a host app just uses createProject() which does both.
  * Throws PackkitValidationError if the config is fatally invalid.
+ *
+ * @returns {{ config: object, diagnostics: object[] }}
  */
-export function createProject(input = {}) {
-  if (!input || typeof input !== 'object') throw new TypeError('createProject expects an input object.');
+export function resolveProjectConfig(input = {}) {
+  if (!input || typeof input !== 'object') throw new TypeError('resolveProjectConfig expects an input object.');
 
   const merged = { ...(input.config || {}), ...(input.overrides || {}) };
   if (input.name != null) merged.name = input.name;
@@ -106,7 +112,36 @@ export function createProject(input = {}) {
   const raw = canonicalPreset
     ? { ...PRESETS[canonicalPreset], ...merged, preset: canonicalPreset }
     : merged;
-  const { config, files, summary, fileSources, fragments } = generateTracked({ ...raw, generatorVersion: packkitVersion() }, diagnostics);
+  const config = normalizeConfig({ ...raw, generatorVersion: packkitVersion() }, diagnostics);
+  return { config, diagnostics };
+}
+
+/**
+ * Generate a complete project in memory. No files are written, nothing is
+ * installed, no commands run. Returns a GeneratedProject with diagnostics.
+ * Throws PackkitValidationError if the config is fatally invalid.
+ */
+export function createProject(input = {}) {
+  const { config, diagnostics } = resolveProjectConfig(input);
+  return assembleProject(config, diagnostics);
+}
+
+/**
+ * Build a project from an already-resolved config (from resolveProjectConfig,
+ * possibly with a field like `repo` set since). For trusted callers only — the
+ * config is assumed valid; pass its resolution diagnostics through so they
+ * appear on the project. Re-normalizes idempotently.
+ */
+export function createProjectFromResolvedConfig(config, { diagnostics = [] } = {}) {
+  const resolved = normalizeConfig({ generatorVersion: packkitVersion(), ...config });
+  return assembleProject(resolved, [...diagnostics]);
+}
+
+// Shared generation core: turn a resolved config into a GeneratedProject,
+// appending collision and package-conflict diagnostics to whatever the caller
+// already collected during resolution.
+function assembleProject(config, diagnostics) {
+  const { files, summary, fileSources, fragments } = generateTracked(config);
 
   for (const [path, sources] of Object.entries(fileSources)) {
     if (sources.length > 1) {

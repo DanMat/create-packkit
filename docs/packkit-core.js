@@ -461,7 +461,6 @@ var meta_default = {
   }
 };
 function libraryEntry(cfg) {
-  if (cfg.isReact) return reactEntry(cfg);
   if (cfg.isTs) {
     return [
       `/** Greet someone by name. */`,

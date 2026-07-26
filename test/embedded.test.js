@@ -369,3 +369,27 @@ test('definition replay preserves the original add/replace mode across a round-t
   const replayedReplace = createProjectFromDefinition(exportProjectDefinition(replaced));
   assert.equal(exportProjectDefinition(replayedReplace).extensions.files['package.json'].mode, 'replace');
 });
+
+// ---- two-phase resolution (the CLI runs on this) ---------------------------
+
+test('resolveProjectConfig + createProjectFromResolvedConfig equals createProject', async () => {
+  const { resolveProjectConfig, createProjectFromResolvedConfig } = await import('../src/embedded/index.js');
+  // Two-phase (what the CLI does) must match the one-shot createProject.
+  const { config, diagnostics } = resolveProjectConfig({ preset: 'node-service', name: 'svc', overrides: { storybook: true } });
+  assert.ok(config.name === 'svc');
+  assert.ok(diagnostics.some((d) => d.code === 'STORYBOOK_REQUIRES_COMPONENT_LIBRARY'), 'coercion captured at resolve time');
+
+  const two = createProjectFromResolvedConfig(config, { diagnostics });
+  const one = createProject({ preset: 'node-service', name: 'svc', overrides: { storybook: true } });
+  assert.equal(calculateProjectDigest(two), calculateProjectDigest(one));
+  // The resolution diagnostics carried through to the project.
+  assert.ok(two.diagnostics.some((d) => d.code === 'STORYBOOK_REQUIRES_COMPONENT_LIBRARY'));
+});
+
+test('createProjectFromResolvedConfig honors a field set after resolution (repo)', async () => {
+  const { resolveProjectConfig, createProjectFromResolvedConfig } = await import('../src/embedded/index.js');
+  const { config, diagnostics } = resolveProjectConfig({ preset: 'ts-lib', name: 'lib' });
+  config.repo = 'https://github.com/acme/lib'; // the CLI does this after resolving the remote
+  const project = createProjectFromResolvedConfig(config, { diagnostics });
+  assert.match(project.files['package.json'], /acme\/lib/);
+});

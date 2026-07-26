@@ -85,6 +85,8 @@ export class PackkitValidationError extends Error {
 export const SCHEMA_VERSION: number;
 
 export function createProject(input?: CreateProjectInput): GeneratedProject;
+export function resolveProjectConfig(input?: CreateProjectInput): { config: ResolvedPackkitConfig; diagnostics: Diagnostic[] };
+export function createProjectFromResolvedConfig(config: ResolvedPackkitConfig, options?: { diagnostics?: Diagnostic[] }): GeneratedProject;
 export function extendProject(project: GeneratedProject, extension?: ProjectExtension): GeneratedProject;
 export function exportProjectDefinition(project: GeneratedProject): PackkitProjectDefinition;
 export function createProjectFromDefinition(definition: PackkitProjectDefinition): GeneratedProject;
