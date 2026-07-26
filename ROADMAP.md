@@ -50,6 +50,19 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 - [ ] **Vue/Svelte app scaffolds with a router** — the app targets are minimal SPAs; add vue-router / SvelteKit-style routing (plus a React Router option).
 - [ ] **Multiple entry points** — `exports` subpaths (e.g. `./utils`) with per-entry builds (tsup multi-entry).
 
+### Layering (from the 3.0 approval review)
+_3.0 turned the embedded API into Packkit's public programmatic surface. Keeping the layers distinct is now an explicit design rule, not an accident of the current code._
+
+**Architecture principles** — worth writing into a short `ARCHITECTURE.md`:
+1. The core never performs side effects.
+2. The embedded API is the only supported programmatic surface.
+3. The CLI is implemented on top of the embedded API.
+4. The web configurator is implemented on top of the embedded API (its bundled core).
+5. MCP is implemented on top of the embedded API.
+6. Future providers (Netlify, AWS, …) never bypass the embedded API.
+
+- [ ] **CLI on the embedded API** — today the CLI calls `generate` (core) directly; only the writer differs from the embedded path. Rebase it onto `createProject`/`writeGeneratedProject` so there's exactly **one** orchestration layer and every surface (CLI, web, MCP, host apps) shares the same diagnostics, collision handling, and path safety. Adapters at the edges, one engine in the middle. Do this *after* 3.0 ships, carefully — the CLI's install/git/prompt behavior must stay identical.
+
 ### Embedded API follow-ups (from the 3.0 review)
 _Non-blocking items deferred from PR #17. The blockers (symlink safety, replay mode-preservation) shipped in 3.0._
 
