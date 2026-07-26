@@ -23,10 +23,7 @@ export function buildMonorepo(cfg) {
   const utils = `@${scope}/utils`;
   const wsProto = pm === 'pnpm' ? 'workspace:*' : '*';
 
-  // Reuse the package-agnostic root files (LICENSE, community, AGENTS.md, gitignore).
-  for (const feat of [community, agents, gitfiles]) {
-    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
-  }
+  Object.assign(files, workspaceScaffold(cfg, { workspaceGlobs: ['packages/*'] }));
 
   // ---- root ----
   const rootPkg = {
@@ -61,8 +58,6 @@ export function buildMonorepo(cfg) {
   };
   files['package.json'] = toJson(rootPkg);
 
-  if (pm === 'pnpm') files['pnpm-workspace.yaml'] = 'packages:\n  - "packages/*"\n';
-
   files['turbo.json'] = toJson({
     $schema: 'https://turbo.build/schema.json',
     tasks: {
@@ -71,21 +66,6 @@ export function buildMonorepo(cfg) {
       typecheck: { dependsOn: ['^build'] },
       lint: {},
       dev: { cache: false, persistent: true },
-    },
-  });
-
-  files['tsconfig.base.json'] = toJson({
-    $schema: 'https://json.schemastore.org/tsconfig',
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'Bundler',
-      lib: ['ES2022'],
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      declaration: true,
-      noEmit: true,
     },
   });
 
@@ -98,22 +78,7 @@ export function buildMonorepo(cfg) {
   });
   files['.changeset/README.md'] = '# Changesets\n\nRun `npx changeset` to record a version bump for your next release.\n';
 
-  files['eslint.config.js'] = [
-    `import js from '@eslint/js';`,
-    `import tseslint from 'typescript-eslint';`,
-    ``,
-    `export default tseslint.config(`,
-    `\tjs.configs.recommended,`,
-    `\t...tseslint.configs.recommended,`,
-    `\t{ ignores: ['**/dist'] },`,
-    `);`,
-    ``,
-  ].join('\n');
-  files['.prettierrc.json'] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: 'all' });
-
   files['README.md'] = rootReadme(cfg, pm, core, utils);
-  files['packkit.json'] = provenance(cfg);
-  files['.github/workflows/ci.yml'] = ciWorkflow(cfg, pm);
 
   // ---- packages ----
   addPackage(files, {
@@ -174,9 +139,8 @@ function buildFullstack(cfg) {
   const shared = `@${scope}/shared`;
   const wsProto = pm === 'pnpm' ? 'workspace:*' : '*';
 
-  for (const feat of [community, agents, gitfiles]) {
-    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
-  }
+  // apps/* + packages/*, and the DOM lib the web app's JSX needs.
+  Object.assign(files, workspaceScaffold(cfg, { workspaceGlobs: ['apps/*', 'packages/*'], tsconfigLib: ['ES2022', 'DOM'] }));
 
   files['package.json'] = toJson({
     name: cfg.name,
@@ -208,10 +172,6 @@ function buildFullstack(cfg) {
     },
   });
 
-  if (pm === 'pnpm') {
-    files['pnpm-workspace.yaml'] = 'packages:\n  - "apps/*"\n  - "packages/*"\n';
-  }
-
   files['turbo.json'] = toJson({
     $schema: 'https://turbo.build/schema.json',
     tasks: {
@@ -225,36 +185,7 @@ function buildFullstack(cfg) {
     },
   });
 
-  files['tsconfig.base.json'] = toJson({
-    $schema: 'https://json.schemastore.org/tsconfig',
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'Bundler',
-      lib: ['ES2022', 'DOM'],
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      declaration: true,
-      noEmit: true,
-    },
-  });
-
-  files['eslint.config.js'] = [
-    `import js from '@eslint/js';`,
-    `import tseslint from 'typescript-eslint';`,
-    ``,
-    `export default tseslint.config(`,
-    `\tjs.configs.recommended,`,
-    `\t...tseslint.configs.recommended,`,
-    `\t{ ignores: ['**/dist'] },`,
-    `);`,
-    ``,
-  ].join('\n');
-  files['.prettierrc.json'] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: 'all' });
-  files['.github/workflows/ci.yml'] = ciWorkflow(cfg, pm);
   files['README.md'] = fullstackReadme(cfg, pm, shared);
-  files['packkit.json'] = provenance(cfg);
 
   // ---- packages/shared: the contract both sides compile against ----
   files['packages/shared/package.json'] = toJson({
@@ -512,6 +443,50 @@ function fullstackReadme(cfg, pm, shared) {
     '',
     cfg.license !== 'none' ? `## License\n\n${cfg.license}${cfg.author ? ' © ' + cfg.author : ''}\n` : '',
   ].join('\n');
+}
+
+// Root-level scaffolding shared by both monorepo layouts: workspace globs, the
+// TypeScript base config, lint/format config, community files, CI, and
+// provenance. Each layout adds its own root package.json, turbo tasks, and
+// packages on top. Extracted so these aren't maintained twice.
+function workspaceScaffold(cfg, { workspaceGlobs, tsconfigLib = ['ES2022'] }) {
+  const files = {};
+  // Reuse the package-agnostic root files (LICENSE, community, AGENTS.md, gitignore).
+  for (const feat of [community, agents, gitfiles]) {
+    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
+  }
+  if (cfg.packageManager === 'pnpm') {
+    files['pnpm-workspace.yaml'] = 'packages:\n' + workspaceGlobs.map((g) => `  - "${g}"\n`).join('');
+  }
+  files['tsconfig.base.json'] = toJson({
+    $schema: 'https://json.schemastore.org/tsconfig',
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      lib: tsconfigLib,
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      declaration: true,
+      noEmit: true,
+    },
+  });
+  files['eslint.config.js'] = [
+    `import js from '@eslint/js';`,
+    `import tseslint from 'typescript-eslint';`,
+    ``,
+    `export default tseslint.config(`,
+    `\tjs.configs.recommended,`,
+    `\t...tseslint.configs.recommended,`,
+    `\t{ ignores: ['**/dist'] },`,
+    `);`,
+    ``,
+  ].join('\n');
+  files['.prettierrc.json'] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: 'all' });
+  files['.github/workflows/ci.yml'] = ciWorkflow(cfg, cfg.packageManager);
+  files['packkit.json'] = provenance(cfg);
+  return files;
 }
 
 function addPackage(files, { name, dir, src, test, deps }) {
