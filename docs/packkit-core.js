@@ -2488,9 +2488,7 @@ function buildMonorepo(cfg) {
   const core = `@${scope}/core`;
   const utils = `@${scope}/utils`;
   const wsProto = pm === "pnpm" ? "workspace:*" : "*";
-  for (const feat of [community_default, agents_default, gitfiles_default]) {
-    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
-  }
+  Object.assign(files, workspaceScaffold(cfg, { workspaceGlobs: ["packages/*"] }));
   const rootPkg = {
     name: cfg.name,
     version: "0.0.0",
@@ -2522,7 +2520,6 @@ function buildMonorepo(cfg) {
     }
   };
   files["package.json"] = toJson(rootPkg);
-  if (pm === "pnpm") files["pnpm-workspace.yaml"] = 'packages:\n  - "packages/*"\n';
   files["turbo.json"] = toJson({
     $schema: "https://turbo.build/schema.json",
     tasks: {
@@ -2533,20 +2530,6 @@ function buildMonorepo(cfg) {
       dev: { cache: false, persistent: true }
     }
   });
-  files["tsconfig.base.json"] = toJson({
-    $schema: "https://json.schemastore.org/tsconfig",
-    compilerOptions: {
-      target: "ES2022",
-      module: "ESNext",
-      moduleResolution: "Bundler",
-      lib: ["ES2022"],
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      declaration: true,
-      noEmit: true
-    }
-  });
   files[".changeset/config.json"] = toJson({
     $schema: "https://unpkg.com/@changesets/config@3.0.0/schema.json",
     changelog: "@changesets/cli/changelog",
@@ -2555,21 +2538,7 @@ function buildMonorepo(cfg) {
     baseBranch: "main"
   });
   files[".changeset/README.md"] = "# Changesets\n\nRun `npx changeset` to record a version bump for your next release.\n";
-  files["eslint.config.js"] = [
-    `import js from '@eslint/js';`,
-    `import tseslint from 'typescript-eslint';`,
-    ``,
-    `export default tseslint.config(`,
-    `	js.configs.recommended,`,
-    `	...tseslint.configs.recommended,`,
-    `	{ ignores: ['**/dist'] },`,
-    `);`,
-    ``
-  ].join("\n");
-  files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
   files["README.md"] = rootReadme(cfg, pm, core, utils);
-  files["packkit.json"] = provenance(cfg);
-  files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, pm);
   addPackage(files, {
     name: core,
     dir: "packages/core",
@@ -2616,9 +2585,7 @@ function buildFullstack(cfg) {
   const scope = cfg.name.replace(/^@/, "").split("/")[0];
   const shared = `@${scope}/shared`;
   const wsProto = pm === "pnpm" ? "workspace:*" : "*";
-  for (const feat of [community_default, agents_default, gitfiles_default]) {
-    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
-  }
+  Object.assign(files, workspaceScaffold(cfg, { workspaceGlobs: ["apps/*", "packages/*"], tsconfigLib: ["ES2022", "DOM"] }));
   files["package.json"] = toJson({
     name: cfg.name,
     version: "0.0.0",
@@ -2646,9 +2613,6 @@ function buildFullstack(cfg) {
       "@types/node": `^${cfg.nodeVersion}.0.0`
     }
   });
-  if (pm === "pnpm") {
-    files["pnpm-workspace.yaml"] = 'packages:\n  - "apps/*"\n  - "packages/*"\n';
-  }
   files["turbo.json"] = toJson({
     $schema: "https://turbo.build/schema.json",
     tasks: {
@@ -2661,35 +2625,7 @@ function buildFullstack(cfg) {
       lint: {}
     }
   });
-  files["tsconfig.base.json"] = toJson({
-    $schema: "https://json.schemastore.org/tsconfig",
-    compilerOptions: {
-      target: "ES2022",
-      module: "ESNext",
-      moduleResolution: "Bundler",
-      lib: ["ES2022", "DOM"],
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      declaration: true,
-      noEmit: true
-    }
-  });
-  files["eslint.config.js"] = [
-    `import js from '@eslint/js';`,
-    `import tseslint from 'typescript-eslint';`,
-    ``,
-    `export default tseslint.config(`,
-    `	js.configs.recommended,`,
-    `	...tseslint.configs.recommended,`,
-    `	{ ignores: ['**/dist'] },`,
-    `);`,
-    ``
-  ].join("\n");
-  files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
-  files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, pm);
   files["README.md"] = fullstackReadme(cfg, pm, shared);
-  files["packkit.json"] = provenance(cfg);
   files["packages/shared/package.json"] = toJson({
     name: shared,
     version: "0.0.0",
@@ -2942,6 +2878,45 @@ function fullstackReadme(cfg, pm, shared) {
 ${cfg.license}${cfg.author ? " \xA9 " + cfg.author : ""}
 ` : ""
   ].join("\n");
+}
+function workspaceScaffold(cfg, { workspaceGlobs, tsconfigLib = ["ES2022"] }) {
+  const files = {};
+  for (const feat of [community_default, agents_default, gitfiles_default]) {
+    if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
+  }
+  if (cfg.packageManager === "pnpm") {
+    files["pnpm-workspace.yaml"] = "packages:\n" + workspaceGlobs.map((g) => `  - "${g}"
+`).join("");
+  }
+  files["tsconfig.base.json"] = toJson({
+    $schema: "https://json.schemastore.org/tsconfig",
+    compilerOptions: {
+      target: "ES2022",
+      module: "ESNext",
+      moduleResolution: "Bundler",
+      lib: tsconfigLib,
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      declaration: true,
+      noEmit: true
+    }
+  });
+  files["eslint.config.js"] = [
+    `import js from '@eslint/js';`,
+    `import tseslint from 'typescript-eslint';`,
+    ``,
+    `export default tseslint.config(`,
+    `	js.configs.recommended,`,
+    `	...tseslint.configs.recommended,`,
+    `	{ ignores: ['**/dist'] },`,
+    `);`,
+    ``
+  ].join("\n");
+  files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
+  files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, cfg.packageManager);
+  files["packkit.json"] = provenance(cfg);
+  return files;
 }
 function addPackage(files, { name, dir, src, test, deps: deps2 }) {
   const pkg = {
