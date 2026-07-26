@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,7 +10,6 @@ import {
   exportProjectDefinition,
   createProjectFromDefinition,
   calculateProjectDigest,
-  deriveDeploymentContract,
   PackkitValidationError,
   SCHEMA_VERSION,
 } from '../src/embedded/index.js';

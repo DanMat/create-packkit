@@ -145,7 +145,6 @@ export function buildMonorepo(cfg) {
     deps: { [core]: wsProto },
   });
 
-  const install = pm === 'npm' ? 'npm install' : `${pm} install`;
   return {
     config: cfg,
     files,
@@ -173,7 +172,6 @@ function buildFullstack(cfg) {
   const scope = cfg.name.replace(/^@/, '').split('/')[0];
   const shared = `@${scope}/shared`;
   const wsProto = pm === 'pnpm' ? 'workspace:*' : '*';
-  const run = (s) => (pm === 'npm' ? `npm run ${s}` : `${pm} ${s}`);
 
   for (const feat of [community, agents, gitfiles]) {
     if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
