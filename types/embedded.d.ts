@@ -95,3 +95,18 @@ export function createProjectFromDefinition(
 ): GeneratedProject;
 export function calculateProjectDigest(project: GeneratedProject): string;
 export function deriveDeploymentContract(config: ResolvedPackkitConfig): DeploymentContract;
+
+export interface UpgradePlan {
+  files: { added: string[]; changed: string[]; unchanged: string[] };
+  packageJson: {
+    addedDependencies: Record<string, { map: string; version: string }>;
+    updatedDependencies: Record<string, { map: string; from: string; to: string }>;
+    addedScripts: Record<string, string>;
+    changedScripts: Record<string, { from: string; to: string }>;
+  };
+  provenanceOutdated: boolean;
+}
+
+export function planUpgrade(input: { generated: Record<string, string>; onDisk: Record<string, string | undefined> }): UpgradePlan;
+export function isUpgradeEmpty(plan: UpgradePlan): boolean;
+export function buildUpgradeWrite(input: { generated: Record<string, string>; onDisk: Record<string, string | undefined>; plan: UpgradePlan; includeChanged?: boolean }): Record<string, string>;

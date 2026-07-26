@@ -24,6 +24,7 @@ import { analyzePkgFragments } from './pkg-merge.js';
 import { deriveDeploymentContract } from './contract.js';
 
 export { deriveDeploymentContract };
+export { planUpgrade, isUpgradeEmpty, buildUpgradeWrite } from './upgrade.js';
 
 // Bumped when the shape of PackkitProjectDefinition changes incompatibly.
 export const SCHEMA_VERSION = 2;
