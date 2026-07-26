@@ -1,5 +1,12 @@
 // Feature registry. Order matters only for how package.json fragments merge
 // (later features deep-merge over earlier ones); files are keyed by path.
+//
+// Ordering contract: no two features may own the same file path or the same
+// package.json field for a given config. That invariant is enforced by
+// test/feature-registry.test.js across the whole config matrix, so ordering is
+// never load-bearing for correctness — if a new feature collides with an
+// existing one, the test fails rather than the winner being decided by position
+// here. Each feature declares a unique `id`, surfaced in collision diagnostics.
 
 import meta from './meta.js';
 import bundler from './bundler.js';

@@ -641,6 +641,7 @@ var bundler_default = {
       pkg.scripts.build = "tsc";
       pkg.scripts.dev = "tsc --watch";
     }
+    if (cfg.hasService) delete pkg.scripts.dev;
     if (build) pkg.scripts.prepublishOnly = pkg.scripts.build;
     pkg.scripts.clean = "rimraf dist";
     if (build) pkg.devDependencies = { ...pkg.devDependencies, rimraf: "^6.0.0" };
