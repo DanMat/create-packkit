@@ -7,6 +7,7 @@ import community from './features/community.js';
 import agents from './features/agents.js';
 import gitfiles from './features/gitfiles.js';
 import { provenance } from './provenance.js';
+import { V } from './versions.js';
 
 export function buildMonorepo(cfg) {
   // Two genuinely different shapes: a set of publishable libraries, or a
@@ -46,15 +47,15 @@ export function buildMonorepo(cfg) {
       release: 'turbo build && changeset publish',
     },
     devDependencies: {
-      turbo: '^2.0.0',
-      typescript: '^5.9.3',
-      tsup: '^8.0.0',
-      vitest: '^4.0.0',
-      eslint: '^10.0.0',
-      '@eslint/js': '^10.0.0',
-      'typescript-eslint': '^8.0.0',
-      prettier: '^3.3.0',
-      '@changesets/cli': '^2.27.0',
+      turbo: V.turbo,
+      typescript: V.typescript,
+      tsup: V.tsup,
+      vitest: V.vitest,
+      eslint: V.eslint,
+      '@eslint/js': V['@eslint/js'],
+      'typescript-eslint': V['typescript-eslint'],
+      prettier: V.prettier,
+      '@changesets/cli': V['@changesets/cli'],
       '@types/node': `^${cfg.nodeVersion}.0.0`,
     },
   };
@@ -196,13 +197,13 @@ function buildFullstack(cfg) {
       typecheck: 'turbo typecheck',
     },
     devDependencies: {
-      turbo: '^2.0.0',
-      typescript: '^5.9.3',
-      vitest: '^4.0.0',
-      eslint: '^10.0.0',
-      '@eslint/js': '^10.0.0',
-      'typescript-eslint': '^8.0.0',
-      prettier: '^3.3.0',
+      turbo: V.turbo,
+      typescript: V.typescript,
+      vitest: V.vitest,
+      eslint: V.eslint,
+      '@eslint/js': V['@eslint/js'],
+      'typescript-eslint': V['typescript-eslint'],
+      prettier: V.prettier,
       '@types/node': `^${cfg.nodeVersion}.0.0`,
     },
   });
@@ -270,7 +271,7 @@ function buildFullstack(cfg) {
       typecheck: 'tsc --noEmit',
       lint: 'eslint .',
     },
-    devDependencies: { tsup: '^8.0.0' },
+    devDependencies: { tsup: V.tsup },
   });
   files['packages/shared/tsconfig.json'] = toJson({ extends: '../../tsconfig.base.json', include: ['src'] });
   files['packages/shared/src/index.ts'] = [
@@ -305,8 +306,8 @@ function buildFullstack(cfg) {
       typecheck: 'tsc --noEmit',
       lint: 'eslint .',
     },
-    dependencies: { hono: '^4.5.0', '@hono/node-server': '^2.0.0', [shared]: wsProto },
-    devDependencies: { tsx: '^4.0.0', tsup: '^8.0.0' },
+    dependencies: { hono: V.hono, '@hono/node-server': V['@hono/node-server'], [shared]: wsProto },
+    devDependencies: { tsx: V.tsx, tsup: V.tsup },
   });
   files['apps/server/tsconfig.json'] = toJson({ extends: '../../tsconfig.base.json', include: ['src'] });
   files['apps/server/src/app.ts'] = [
@@ -366,17 +367,17 @@ function buildFullstack(cfg) {
       typecheck: 'tsc --noEmit',
       lint: 'eslint .',
     },
-    dependencies: { react: '^19.0.0', 'react-dom': '^19.0.0', [shared]: wsProto },
+    dependencies: { react: V.react, 'react-dom': V['react-dom'], [shared]: wsProto },
     devDependencies: {
-      vite: '^8.0.0',
-      '@vitejs/plugin-react': '^6.0.0',
+      vite: V.vite,
+      '@vitejs/plugin-react': V['@vitejs/plugin-react'],
       // Without the React types, `turbo typecheck` fails on the very first run
       // with TS7016/TS7026 on every JSX element.
-      '@types/react': '^19.0.0',
-      '@types/react-dom': '^19.0.0',
-      '@testing-library/react': '^16.0.0',
-      '@testing-library/dom': '^10.0.0',
-      jsdom: '^29.0.0',
+      '@types/react': V['@types/react'],
+      '@types/react-dom': V['@types/react-dom'],
+      '@testing-library/react': V['@testing-library/react'],
+      '@testing-library/dom': V['@testing-library/dom'],
+      jsdom: V.jsdom,
     },
   });
   files['apps/web/tsconfig.json'] = toJson({

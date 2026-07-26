@@ -1,4 +1,5 @@
 import { toJson } from '../render.js';
+import { V } from '../versions.js';
 
 export default {
   id: 'typescript',
@@ -45,7 +46,7 @@ export default {
       },
       pkg: {
         devDependencies: {
-          typescript: '^5.9.3',
+          typescript: V.typescript,
           '@types/node': `^${cfg.nodeVersion}.0.0`,
         },
       },

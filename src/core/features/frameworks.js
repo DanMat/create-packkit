@@ -1,3 +1,4 @@
+import { V, PEER } from '../versions.js';
 // React / Vue / Svelte source + dependencies, for both component libraries and
 // Vite apps. The Vite build wiring lives in vite.js; here we emit the source
 // files, the runtime deps (peer for libs, direct for apps), and — for Svelte
@@ -40,7 +41,7 @@ function react(cfg, files, pkg, forApp) {
       `}`,
       ``,
     ].join('\n');
-    pkg.dependencies = { react: '^19.0.0', 'react-dom': '^19.0.0' };
+    pkg.dependencies = { react: V.react, 'react-dom': V['react-dom'] };
   } else {
     files[`src/index.${x}`] = cfg.isTs
       ? [
@@ -55,13 +56,13 @@ function react(cfg, files, pkg, forApp) {
           ``,
         ].join('\n')
       : [`export function Button({ label, onClick }) {`, `\treturn <button onClick={onClick}>{label}</button>;`, `}`, ``].join('\n');
-    pkg.peerDependencies = { react: '>=18', 'react-dom': '>=18' };
-    pkg.devDependencies.react = '^19.0.0';
-    pkg.devDependencies['react-dom'] = '^19.0.0';
+    pkg.peerDependencies = { react: PEER.react, 'react-dom': PEER['react-dom'] };
+    pkg.devDependencies.react = V.react;
+    pkg.devDependencies['react-dom'] = V['react-dom'];
   }
   if (cfg.isTs) {
-    pkg.devDependencies['@types/react'] = '^19.0.0';
-    pkg.devDependencies['@types/react-dom'] = '^19.0.0';
+    pkg.devDependencies['@types/react'] = V['@types/react'];
+    pkg.devDependencies['@types/react-dom'] = V['@types/react-dom'];
   }
 }
 
@@ -78,7 +79,7 @@ function vue(cfg, files, pkg, forApp) {
       ``,
     ].join('\n');
     files['src/App.vue'] = [script, `</script>`, ``, `<template>`, `\t<h1>Hello from ${cfg.name}</h1>`, `</template>`, ``].join('\n');
-    pkg.dependencies = { vue: '^3.4.0' };
+    pkg.dependencies = { vue: V.vue };
   } else {
     files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.vue';\n`;
     files['src/Button.vue'] = [
@@ -91,8 +92,8 @@ function vue(cfg, files, pkg, forApp) {
       `</template>`,
       ``,
     ].join('\n');
-    pkg.peerDependencies = { vue: '>=3' };
-    pkg.devDependencies.vue = '^3.4.0';
+    pkg.peerDependencies = { vue: PEER.vue };
+    pkg.devDependencies.vue = V.vue;
   }
 }
 
@@ -101,8 +102,8 @@ function svelte(cfg, files, pkg, forApp) {
   const script = cfg.isTs ? `<script lang="ts">` : `<script>`;
   // Shared by the Vite app build and the Vitest (test) config; enables TS in SFCs.
   files['svelte.config.js'] = `import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';\n\nexport default { preprocess: vitePreprocess() };\n`;
-  pkg.devDependencies['@sveltejs/vite-plugin-svelte'] = '^7.0.0';
-  if (cfg.isTs) pkg.devDependencies['svelte-check'] = '^4.0.0';
+  pkg.devDependencies['@sveltejs/vite-plugin-svelte'] = V['@sveltejs/vite-plugin-svelte'];
+  if (cfg.isTs) pkg.devDependencies['svelte-check'] = V['svelte-check'];
   if (forApp) {
     files['index.html'] = htmlShell(cfg, `/src/main.${cfg.ext}`);
     files[`src/main.${cfg.ext}`] = [
@@ -114,7 +115,7 @@ function svelte(cfg, files, pkg, forApp) {
       ``,
     ].join('\n');
     files['src/App.svelte'] = [script, `</script>`, ``, `<h1>Hello from ${cfg.name}</h1>`, ``].join('\n');
-    pkg.dependencies = { svelte: '^5.0.0' };
+    pkg.dependencies = { svelte: V.svelte };
   } else {
     // Svelte libraries ship uncompiled source; the consumer's bundler compiles.
     files[`src/index.${cfg.ext}`] = `export { default as Button } from './Button.svelte';\n`;
@@ -127,8 +128,8 @@ function svelte(cfg, files, pkg, forApp) {
       `<button>{label}</button>`,
       ``,
     ].filter((l) => l !== ``).join('\n') + '\n';
-    pkg.peerDependencies = { svelte: '>=5' };
-    pkg.devDependencies.svelte = '^5.0.0';
+    pkg.peerDependencies = { svelte: PEER.svelte };
+    pkg.devDependencies.svelte = V.svelte;
     // Ship source; point consumers at it.
     pkg.svelte = `./src/index.${cfg.ext}`;
     pkg.exports = { '.': { svelte: `./src/index.${cfg.ext}`, default: `./src/index.${cfg.ext}` } };

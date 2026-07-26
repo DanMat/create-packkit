@@ -1,3 +1,4 @@
+import { V } from '../versions.js';
 // Always-on. Owns the package entry points (exports/main/module/types/files)
 // and the build tooling for the chosen bundler.
 
@@ -48,24 +49,24 @@ export default {
       files[`${tool}.config.${cfg.ext}`] = tsupConfig(cfg, entries, formats, tool);
       pkg.scripts.build = tool;
       pkg.scripts.dev = `${tool} --watch`;
-      pkg.devDependencies = { [tool]: tool === 'tsup' ? '^8.0.0' : '^0.6.0' };
+      pkg.devDependencies = { [tool]: tool === 'tsup' ? V.tsup : V.tsdown };
       // tsup/tsdown resolve `typescript` even for plain-JS builds; TS projects
       // already get it from the typescript feature.
-      if (!cfg.isTs) pkg.devDependencies.typescript = '^5.9.3';
+      if (!cfg.isTs) pkg.devDependencies.typescript = V.typescript;
     } else if (cfg.bundler === 'unbuild') {
       files['build.config.ts'] = unbuildConfig(cfg);
       pkg.scripts.build = 'unbuild';
       pkg.scripts.dev = 'unbuild --stub';
-      pkg.devDependencies = { unbuild: '^3.0.0' };
+      pkg.devDependencies = { unbuild: V.unbuild };
     } else if (cfg.bundler === 'rollup') {
       // Always a .js config — rollup can't load a .ts config without a loader.
       files['rollup.config.js'] = rollupConfig(cfg, formats);
       pkg.scripts.build = 'rollup -c';
       pkg.scripts.dev = 'rollup -c -w';
       pkg.devDependencies = {
-        rollup: '^4.0.0',
-        ...(cfg.isTs ? { '@rollup/plugin-typescript': '^12.0.0', tslib: '^2.6.0' } : {}),
-        ...(cfg.minify ? { '@rollup/plugin-terser': '^1.0.0' } : {}),
+        rollup: V.rollup,
+        ...(cfg.isTs ? { '@rollup/plugin-typescript': V['@rollup/plugin-typescript'], tslib: V.tslib } : {}),
+        ...(cfg.minify ? { '@rollup/plugin-terser': V['@rollup/plugin-terser'] } : {}),
       };
     } else if (cfg.bundler === 'none' && cfg.isTs) {
       // tsc-only build for TypeScript.
@@ -80,7 +81,7 @@ export default {
 
     if (build) pkg.scripts.prepublishOnly = pkg.scripts.build;
     pkg.scripts.clean = 'rimraf dist';
-    if (build) pkg.devDependencies = { ...pkg.devDependencies, rimraf: '^6.0.0' };
+    if (build) pkg.devDependencies = { ...pkg.devDependencies, rimraf: V.rimraf };
 
     return { files, pkg };
   },

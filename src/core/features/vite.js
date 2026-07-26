@@ -1,12 +1,13 @@
+import { V } from '../versions.js';
 // Vite build path: powers Vite SPA apps (React/Vue/Svelte) and Vue component
 // libraries (SFCs need a real compiler). Owns the vite config, build scripts,
 // and — for libraries — the package entry points. index.html + source come
 // from frameworks.js. Svelte libraries ship source and don't come through here.
 
 const PLUGIN = {
-  react: { import: `import react from '@vitejs/plugin-react';`, call: 'react()', dep: { '@vitejs/plugin-react': '^6.0.0' } },
-  vue: { import: `import vue from '@vitejs/plugin-vue';`, call: 'vue()', dep: { '@vitejs/plugin-vue': '^6.0.0' } },
-  svelte: { import: `import { svelte } from '@sveltejs/vite-plugin-svelte';`, call: 'svelte()', dep: { '@sveltejs/vite-plugin-svelte': '^7.0.0' } },
+  react: { import: `import react from '@vitejs/plugin-react';`, call: 'react()', dep: { '@vitejs/plugin-react': V['@vitejs/plugin-react'] } },
+  vue: { import: `import vue from '@vitejs/plugin-vue';`, call: 'vue()', dep: { '@vitejs/plugin-vue': V['@vitejs/plugin-vue'] } },
+  svelte: { import: `import { svelte } from '@sveltejs/vite-plugin-svelte';`, call: 'svelte()', dep: { '@sveltejs/vite-plugin-svelte': V['@sveltejs/vite-plugin-svelte'] } },
 };
 
 export default {
@@ -14,10 +15,10 @@ export default {
   active: (cfg) => cfg.viteBuild,
   apply(cfg) {
     const files = {};
-    const pkg = { scripts: {}, devDependencies: { vite: '^8.0.0' } };
+    const pkg = { scripts: {}, devDependencies: { vite: V.vite } };
     const p = PLUGIN[cfg.framework];
     Object.assign(pkg.devDependencies, p.dep);
-    if (cfg.isVue && cfg.isTs) pkg.devDependencies['vue-tsc'] = '^3.0.0';
+    if (cfg.isVue && cfg.isTs) pkg.devDependencies['vue-tsc'] = V['vue-tsc'];
 
     if (cfg.hasApp) {
       // Front-end SPA — not a published package.
@@ -48,8 +49,8 @@ export default {
       ].join('\n');
       pkg.scripts.build = 'vite build';
       pkg.scripts.dev = 'vite build --watch';
-      pkg.devDependencies['vite-plugin-dts'] = '^5.0.0';
-      if (cfg.isVue) pkg.devDependencies['vue-tsc'] = '^3.0.0';
+      pkg.devDependencies['vite-plugin-dts'] = V['vite-plugin-dts'];
+      if (cfg.isVue) pkg.devDependencies['vue-tsc'] = V['vue-tsc'];
       // entry points
       pkg.files = ['dist'];
       pkg.type = 'module';
@@ -60,7 +61,7 @@ export default {
     }
 
     pkg.scripts.clean = 'rimraf dist';
-    pkg.devDependencies.rimraf = '^6.0.0';
+    pkg.devDependencies.rimraf = V.rimraf;
     return { files, pkg };
   },
 };
