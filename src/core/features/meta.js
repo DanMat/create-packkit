@@ -54,7 +54,8 @@ export default {
 };
 
 function libraryEntry(cfg) {
-  if (cfg.isReact) return reactEntry(cfg);
+  // Only reached for a plain library (the caller guards on !cfg.hasFramework),
+  // so framework entries never come through here — frameworks.js writes those.
   if (cfg.isTs) {
     return [
       `/** Greet someone by name. */`,

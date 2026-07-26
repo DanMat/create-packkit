@@ -2,12 +2,17 @@ import { resolve, basename } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
-import { generate, fromPreset, normalizeConfig, PRESET_NAMES, OPTIONS, OPTION_HELP, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
+import { PRESET_NAMES, OPTIONS, OPTION_HELP, PRESET_INFO, PRESET_ALIASES } from '../core/index.js';
 import { engineFloor, meetsNodeFloor } from '../core/node.js';
+// The CLI is an adapter over the embedded API: it resolves + generates through
+// the same pipeline every other surface uses (so it shares diagnostics,
+// collision handling, and path safety), and adds the side effects the embedded
+// API deliberately never performs — git, install, and creating the remote.
+import { resolveProjectConfig, createProjectFromResolvedConfig, PackkitValidationError } from '../embedded/index.js';
+import { writeGeneratedProject } from '../embedded/writer.js';
 import { parseCliArgs } from './args.js';
 import { runWizard } from './wizard.js';
 import {
-  writeProject,
   existingEntries,
   gitInit,
   installDeps,
@@ -125,21 +130,33 @@ export async function run(argv = process.argv.slice(2)) {
   const profile = loadProfile(args);
   const seed = { ...profile, ...args.overrides };
 
-  let config;
+  // Gather raw input for the embedded resolver — don't normalize here, so the
+  // resolver captures the coercions it makes (they surface as warnings below).
+  let rawInput;
+  let presetName;
   if (interactive) {
     p.intro('📦 Packkit');
-    config = normalizeConfig(await runWizard(seed));
+    rawInput = await runWizard(seed);
   } else if (args.preset) {
-    config = fromPreset(args.preset, seed);
+    presetName = args.preset;
+    rawInput = seed;
   } else {
-    config = normalizeConfig(seed);
+    rawInput = seed;
   }
+  // gitInit/install are real options, so they flow through resolution.
+  rawInput = { ...rawInput, gitInit: args.git, install: args.install };
 
-  config.gitInit = args.git;
-  config.install = args.install;
-  // Core is version-agnostic (it also runs in the browser), so the surface
-  // that knows the version supplies it for packkit.json.
-  config.generatorVersion = pkgVersion();
+  let config;
+  let diagnostics;
+  try {
+    ({ config, diagnostics } = resolveProjectConfig({ preset: presetName, config: rawInput }));
+  } catch (err) {
+    if (err instanceof PackkitValidationError) {
+      console.error(err.diagnostics.map((d) => `✖ ${d.message}`).join('\n'));
+      process.exit(1);
+    }
+    throw err;
+  }
 
   // Node preflight: the generated project's tools (eslint, vite, vitest) hard-
   // require this floor. npm only *warns* on engines, so catch it here — clearly,
@@ -186,9 +203,25 @@ export async function run(argv = process.argv.slice(2)) {
   }
   if (remote?.url && /^https?:/.test(remote.url)) config.repo = remote.url;
 
-  // Generate + write.
-  const { files, summary } = generate(config);
-  const { skipped } = await writeProject(targetDir, files, { merge: args.merge });
+  // Generate through the embedded pipeline (carrying the resolution diagnostics)
+  // and write through the safe writer. --merge maps to the 'skip' policy: write
+  // what's absent, keep what's there — never overwrite.
+  const project = createProjectFromResolvedConfig(config, { diagnostics });
+  const { summary } = project;
+
+  // Surface anything Packkit changed or flagged during resolution — a coercion
+  // (Storybook off for a service), an unknown option — before writing.
+  const warnings = project.diagnostics.filter((d) => d.severity === 'warning');
+  if (warnings.length) {
+    const lines = warnings.map((d) => d.message).join('\n');
+    if (interactive) p.log.warn(lines); else console.error('\n⚠  ' + warnings.map((d) => d.message).join('\n   '));
+  }
+
+  const { skippedFiles: skipped } = await writeGeneratedProject({
+    project,
+    destination: targetDir,
+    collisionPolicy: args.merge ? 'skip' : 'error',
+  });
 
   // Post steps.
   if (config.gitInit) gitInit(targetDir);

@@ -61,7 +61,7 @@ _3.0 turned the embedded API into Packkit's public programmatic surface. Keeping
 5. MCP is implemented on top of the embedded API.
 6. Future providers (Netlify, AWS, …) never bypass the embedded API.
 
-- [ ] **CLI on the embedded API** — today the CLI calls `generate` (core) directly; only the writer differs from the embedded path. Rebase it onto `createProject`/`writeGeneratedProject` so there's exactly **one** orchestration layer and every surface (CLI, web, MCP, host apps) shares the same diagnostics, collision handling, and path safety. Adapters at the edges, one engine in the middle. Do this *after* 3.0 ships, carefully — the CLI's install/git/prompt behavior must stay identical.
+- [x] ~~**CLI on the embedded API**~~ — **Shipped (3.1).** The CLI resolves + generates through `resolveProjectConfig` / `createProjectFromResolvedConfig` and writes through `writeGeneratedProject`, so every surface shares one pipeline (diagnostics, collision handling, path safety). Side effects (git, install, remote) stay in the CLI adapter. Behavior verified identical — exact file parity, merge/abort/remote/install all preserved — and the CLI now surfaces coercion warnings it used to swallow. The six layering principles are written down in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Embedded API follow-ups (from the 3.0 review)
 _Non-blocking items deferred from PR #17. The blockers (symlink safety, replay mode-preservation) shipped in 3.0._
