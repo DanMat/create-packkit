@@ -5,16 +5,14 @@
 // dependency that is a full major version behind. Exits 1 if anything is stale.
 
 import { generate, normalizeConfig, fromPreset, PRESET_NAMES } from '../src/core/index.js';
+import { HELD } from '../src/core/versions.js';
 
 // Ignore version-pinned-to-something-else or non-semver specifiers.
 const IGNORE = new Set(['@types/node']);
 
-// Intentionally held back for compatibility — reported separately, not as failures.
-const HELD = {
-  typescript: 'typescript-eslint peers typescript <6.1.0 (no TS 7 support yet)',
-  knip: 'v6 crashes on the oxc-parser native binding',
-  'lint-staged': 'v17 requires Node >=22.22.1, above our Node 22 engines floor; hold at 16 to keep the Maintenance-LTS line working',
-};
+// HELD (deps deliberately kept below their latest major, with the reason) is the
+// single source of truth in src/core/versions.js — imported here so the reasons
+// aren't duplicated and drift.
 const isSemverish = (v) => /^[\^~>=]*\d+\.\d+/.test(v) || /^[\^~>=]*\d+$/.test(v);
 const floorMajor = (v) => parseInt(String(v).replace(/^[\^~>=v\s]+/, ''), 10);
 

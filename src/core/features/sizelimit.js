@@ -2,6 +2,7 @@
 // brotli-compressed size of the built entry and fails when it exceeds the
 // limit — cheap insurance against a dependency silently bloating the package.
 import { toJson } from '../render.js';
+import { V } from '../versions.js';
 
 export default {
   id: 'sizelimit',
@@ -14,8 +15,8 @@ export default {
       pkg: {
         scripts: { size: 'size-limit' },
         devDependencies: {
-          'size-limit': '^11.0.0',
-          '@size-limit/preset-small-lib': '^11.0.0',
+          'size-limit': V['size-limit'],
+          '@size-limit/preset-small-lib': V['@size-limit/preset-small-lib'],
         },
       },
     };

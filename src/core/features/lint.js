@@ -1,4 +1,5 @@
 import { toJson } from '../render.js';
+import { V } from '../versions.js';
 
 export default {
   id: 'lint',
@@ -19,19 +20,19 @@ export default {
       files['.prettierignore'] = 'dist\ncoverage\n';
       pkg.scripts.format = 'prettier --write .';
       pkg.scripts['format:check'] = 'prettier --check .';
-      pkg.devDependencies.prettier = '^3.3.0';
+      pkg.devDependencies.prettier = V.prettier;
     }
 
     if (cfg.lint === 'eslint-prettier') {
       files['eslint.config.js'] = eslintFlatConfig(cfg);
       pkg.scripts.lint = 'eslint .';
       pkg.scripts['lint:fix'] = 'eslint . --fix';
-      pkg.devDependencies.eslint = '^10.0.0';
-      pkg.devDependencies['@eslint/js'] = '^10.0.0';
-      if (cfg.isTs) pkg.devDependencies['typescript-eslint'] = '^8.0.0';
+      pkg.devDependencies.eslint = V.eslint;
+      pkg.devDependencies['@eslint/js'] = V['@eslint/js'];
+      if (cfg.isTs) pkg.devDependencies['typescript-eslint'] = V['typescript-eslint'];
     } else if (cfg.lint === 'oxlint') {
       pkg.scripts.lint = 'oxlint';
-      pkg.devDependencies.oxlint = '^1.0.0';
+      pkg.devDependencies.oxlint = V.oxlint;
     } else if (cfg.lint === 'biome') {
       files['biome.json'] = toJson({
         $schema: 'https://biomejs.dev/schemas/2.1.2/schema.json',
@@ -42,7 +43,7 @@ export default {
       pkg.scripts.lint = 'biome lint .';
       pkg.scripts['lint:fix'] = 'biome lint --write .';
       pkg.scripts.format = 'biome format --write .';
-      pkg.devDependencies['@biomejs/biome'] = '^2.0.0';
+      pkg.devDependencies['@biomejs/biome'] = V['@biomejs/biome'];
     }
 
     return { files, pkg };

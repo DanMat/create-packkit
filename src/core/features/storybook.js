@@ -1,3 +1,4 @@
+import { V } from '../versions.js';
 // Storybook for component libraries (React / Vue / Svelte), on the Vite builder.
 
 const FW = {
@@ -37,10 +38,10 @@ export default {
           'build-storybook': 'storybook build',
         },
         devDependencies: {
-          storybook: '^10.0.0',
-          [fw.builder]: '^10.0.0',
-          [fw.renderer]: '^10.0.0',
-          vite: '^8.0.0',
+          storybook: V.storybook,
+          [fw.builder]: V[fw.builder],
+          [fw.renderer]: V[fw.renderer],
+          vite: V.vite,
         },
       },
     };

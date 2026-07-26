@@ -1,4 +1,5 @@
 import { toJson } from '../render.js';
+import { V } from '../versions.js';
 
 export default {
   id: 'release',
@@ -21,7 +22,7 @@ export default {
       pkg.scripts.changeset = 'changeset';
       pkg.scripts.version = 'changeset version';
       pkg.scripts.release = `${buildThen(cfg)}changeset publish`;
-      pkg.devDependencies['@changesets/cli'] = '^2.27.0';
+      pkg.devDependencies['@changesets/cli'] = V['@changesets/cli'];
     } else if (cfg.release === 'release-it') {
       files['.release-it.json'] = toJson({
         git: { commitMessage: 'chore: release v${version}' },
@@ -29,10 +30,10 @@ export default {
         npm: { publish: true },
       });
       pkg.scripts.release = 'release-it';
-      pkg.devDependencies['release-it'] = '^20.0.0';
+      pkg.devDependencies['release-it'] = V['release-it'];
     } else if (cfg.release === 'np') {
       pkg.scripts.release = 'np';
-      pkg.devDependencies.np = '^12.0.0';
+      pkg.devDependencies.np = V.np;
     }
 
     return { files, pkg };

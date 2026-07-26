@@ -1,3 +1,4 @@
+import { V } from '../versions.js';
 
 export default {
   id: 'test',
@@ -37,40 +38,40 @@ export default {
       ].filter((l) => l !== null).join('\n');
       pkg.scripts.test = 'vitest run';
       pkg.scripts['test:watch'] = 'vitest';
-      pkg.devDependencies.vitest = '^4.0.0';
+      pkg.devDependencies.vitest = V.vitest;
       if (cfg.hasFramework) {
-        pkg.devDependencies.jsdom = '^29.0.0';
-        pkg.devDependencies['@testing-library/dom'] = '^10.0.0';
-        if (cfg.isReact) pkg.devDependencies['@testing-library/react'] = '^16.0.0';
-        if (cfg.isVue) pkg.devDependencies['@testing-library/vue'] = '^8.1.0';
-        if (cfg.isSvelte) pkg.devDependencies['@testing-library/svelte'] = '^5.2.0';
+        pkg.devDependencies.jsdom = V.jsdom;
+        pkg.devDependencies['@testing-library/dom'] = V['@testing-library/dom'];
+        if (cfg.isReact) pkg.devDependencies['@testing-library/react'] = V['@testing-library/react'];
+        if (cfg.isVue) pkg.devDependencies['@testing-library/vue'] = V['@testing-library/vue'];
+        if (cfg.isSvelte) pkg.devDependencies['@testing-library/svelte'] = V['@testing-library/svelte'];
       }
       if (cfg.coverage) {
         pkg.scripts.coverage = 'vitest run --coverage';
-        pkg.devDependencies['@vitest/coverage-v8'] = '^4.0.0';
+        pkg.devDependencies['@vitest/coverage-v8'] = V['@vitest/coverage-v8'];
       }
       files[`src/index.test.${testExt}`] = exampleTest('vitest', cfg);
     } else if (cfg.test === 'jest') {
       files['jest.config.js'] = jestConfig(cfg);
       pkg.scripts.test = 'jest';
       pkg.scripts['test:watch'] = 'jest --watch';
-      pkg.devDependencies.jest = '^30.0.0';
+      pkg.devDependencies.jest = V.jest;
       if (cfg.isTs) {
-        pkg.devDependencies['ts-jest'] = '^29.0.0';
-        pkg.devDependencies['@types/jest'] = '^30.0.0';
+        pkg.devDependencies['ts-jest'] = V['ts-jest'];
+        pkg.devDependencies['@types/jest'] = V['@types/jest'];
       }
       if (cfg.coverage) pkg.scripts.coverage = 'jest --coverage';
       files[`src/index.test.${testExt}`] = exampleTest('jest', cfg);
     } else if (cfg.test === 'node') {
       pkg.scripts.test = cfg.isTs ? 'node --import tsx --test "src/**/*.test.ts"' : 'node --test';
-      if (cfg.isTs) pkg.devDependencies.tsx = '^4.0.0';
+      if (cfg.isTs) pkg.devDependencies.tsx = V.tsx;
       files[`src/index.test.${testExt}`] = exampleTest('node', cfg);
     }
 
     // Express services test through supertest (no built-in inject).
     if (cfg.hasService && cfg.serviceFramework === 'express') {
-      pkg.devDependencies.supertest = '^7.0.0';
-      if (cfg.isTs) pkg.devDependencies['@types/supertest'] = '^6.0.0';
+      pkg.devDependencies.supertest = V.supertest;
+      if (cfg.isTs) pkg.devDependencies['@types/supertest'] = V['@types/supertest'];
     }
 
     return { files, pkg };

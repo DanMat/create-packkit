@@ -1,3 +1,4 @@
+import { V } from '../versions.js';
 // Type-safe environment-variable validation for server-side runtimes (services
 // and CLIs). Validates process.env once at startup with a Zod schema, so a
 // misconfigured deploy fails fast with a clear message instead of a surprise
@@ -12,7 +13,7 @@ export default {
     files[`src/env.${cfg.ext}`] = cfg.isTs ? envTs() : envJs();
     files['.env.example'] = ['NODE_ENV=development', 'PORT=3000', ''].join('\n');
 
-    return { files, pkg: { dependencies: { zod: '^4.0.0' } } };
+    return { files, pkg: { dependencies: { zod: V.zod } } };
   },
 };
 

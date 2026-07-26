@@ -1,3 +1,4 @@
+import { V } from '../versions.js';
 // HTTP service target. Supports Hono (default), Fastify and Express. Splits the
 // app (testable) from the server entry (which listens), adds start/dev scripts,
 // and a production Dockerfile.
@@ -24,7 +25,7 @@ export default {
         },
         dependencies: deps(fw),
         devDependencies: {
-          ...(cfg.isTs ? { tsx: '^4.0.0' } : {}),
+          ...(cfg.isTs ? { tsx: V.tsx } : {}),
           ...(cfg.isTs ? typeDeps(fw) : {}),
         },
       },
@@ -33,13 +34,13 @@ export default {
 };
 
 function deps(fw) {
-  if (fw === 'fastify') return { fastify: '^5.0.0' };
-  if (fw === 'express') return { express: '^5.0.0' };
-  return { hono: '^4.5.0', '@hono/node-server': '^2.0.0' };
+  if (fw === 'fastify') return { fastify: V.fastify };
+  if (fw === 'express') return { express: V.express };
+  return { hono: V.hono, '@hono/node-server': V['@hono/node-server'] };
 }
 
 function typeDeps(fw) {
-  if (fw === 'express') return { '@types/express': '^5.0.0' };
+  if (fw === 'express') return { '@types/express': V['@types/express'] };
   return {};
 }
 
