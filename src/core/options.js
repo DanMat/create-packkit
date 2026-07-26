@@ -353,5 +353,28 @@ export function normalizeConfig(input = {}, diagnostics = null) {
   if (cfg.release !== 'changesets') coerce('canary', false, 'CANARY_REQUIRES_CHANGESETS', 'Canary releases were disabled because they require the Changesets release flow.');
   // JSR is TypeScript-first, ESM, and for plain (non-framework) libraries.
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) coerce('jsr', false, 'JSR_REQUIRES_PLAIN_TS_LIBRARY', 'JSR publishing was disabled because it applies only to a plain TypeScript library.');
+
+  cfg.resolved = resolvedView(cfg);
   return cfg;
+}
+
+/**
+ * A grouped, read-only view of the derived state — the same booleans the flat
+ * `cfg.has*`/`is*` flags expose, organized by concern. Consumers that prefer
+ * structured access (`cfg.resolved.targets.app`) can use it instead of
+ * re-interpreting raw selections; the flat flags remain for existing code.
+ *
+ * It is derived purely from the flags computed above, and test/invariants.test.js
+ * asserts the two never disagree and that the state is internally consistent —
+ * so the derived model can't silently contradict itself.
+ */
+function resolvedView(cfg) {
+  return {
+    targets: { library: cfg.hasLibrary, cli: cfg.hasCli, service: cfg.hasService, app: cfg.hasApp },
+    language: { typescript: cfg.isTs, ext: cfg.ext, srcExt: cfg.srcExt },
+    framework: { name: cfg.framework, react: cfg.isReact, vue: cfg.isVue, svelte: cfg.isSvelte, any: cfg.hasFramework },
+    build: { vite: cfg.viteBuild, custom: cfg.customBuild, usesVite: cfg.usesVite, has: cfg.hasBuild },
+    module: { format: cfg.moduleFormat, esm: cfg.hasEsm, cjs: cfg.hasCjs },
+    package: { publishable: cfg.publishable, monorepo: cfg.monorepo },
+  };
 }

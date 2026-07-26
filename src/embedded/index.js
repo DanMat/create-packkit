@@ -38,7 +38,7 @@ const MAX_DEFINITION_BYTES = 50_000_000;
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Non-OPTIONS config keys the pipeline sets itself; not "unknown". */
-const KNOWN_EXTRA_KEYS = new Set(['preset', 'generatorVersion']);
+const KNOWN_EXTRA_KEYS = new Set(['preset', 'generatorVersion', 'resolved']);
 
 // Fields where a host override silently changing an existing value is worth a
 // diagnostic (matches pkg-merge's protected set + dependency maps).
