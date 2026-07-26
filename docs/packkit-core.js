@@ -1303,7 +1303,6 @@ import { app } from './app.js';`;
   }
   const api = runner === "jest" ? `` : `import { describe, it, expect } from 'vitest';
 `;
-  const expectApi = runner === "jest" ? "" : "";
   return [
     api + `import { greet } from '${imp}';`,
     ``,
@@ -1471,7 +1470,7 @@ var githooks_default = {
       pkg.scripts.prepare = "husky";
       pkg.devDependencies.husky = "^9.1.0";
     } else if (cfg.gitHooks === "lefthook") {
-      files["lefthook.yml"] = lefthookYml(cfg, staged);
+      files["lefthook.yml"] = lefthookYml(cfg);
       pkg.scripts.prepare = "lefthook install || true";
       pkg.devDependencies.lefthook = "^2.0.0";
     }
@@ -1482,7 +1481,7 @@ var githooks_default = {
     return { files, pkg };
   }
 };
-function lefthookYml(cfg, staged) {
+function lefthookYml(cfg) {
   const cmd = cfg.lint === "biome" ? "biome check --write --no-errors-on-unmatched {staged_files}" : cfg.lint === "none" ? "npm test" : "prettier --write {staged_files}";
   return [
     "pre-commit:",
@@ -2498,7 +2497,6 @@ function buildMonorepo(cfg) {
     test: exampleTest2(`import { shout } from './index.js';`, `expect(shout('world')).toBe('HELLO, WORLD!')`),
     deps: { [core]: wsProto }
   });
-  const install = pm === "npm" ? "npm install" : `${pm} install`;
   return {
     config: cfg,
     files,
@@ -2517,7 +2515,6 @@ function buildFullstack(cfg) {
   const scope = cfg.name.replace(/^@/, "").split("/")[0];
   const shared = `@${scope}/shared`;
   const wsProto = pm === "pnpm" ? "workspace:*" : "*";
-  const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
   for (const feat of [community_default, agents_default, gitfiles_default]) {
     if (feat.active(cfg)) Object.assign(files, feat.apply(cfg).files);
   }

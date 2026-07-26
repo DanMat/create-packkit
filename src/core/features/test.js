@@ -1,4 +1,3 @@
-import { toJson } from '../render.js';
 
 export default {
   id: 'test',
@@ -159,7 +158,6 @@ function exampleTest(runner, cfg) {
     ].join('\n');
   }
   const api = runner === 'jest' ? `` : `import { describe, it, expect } from 'vitest';\n`;
-  const expectApi = runner === 'jest' ? '' : '';
   return [
     api + `import { greet } from '${imp}';`,
     ``,

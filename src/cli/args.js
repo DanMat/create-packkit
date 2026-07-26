@@ -53,7 +53,6 @@ export function parseCliArgs(argv) {
       minify: { type: 'boolean' },
       target: { type: 'string', multiple: true },
       workflows: { type: 'string', multiple: true },
-      minify: { type: 'boolean' },
       monorepo: { type: 'boolean' },
       storybook: { type: 'boolean' },
       e2e: { type: 'boolean' },

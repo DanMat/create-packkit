@@ -27,7 +27,7 @@ export default {
       pkg.scripts.prepare = 'husky';
       pkg.devDependencies.husky = '^9.1.0';
     } else if (cfg.gitHooks === 'lefthook') {
-      files['lefthook.yml'] = lefthookYml(cfg, staged);
+      files['lefthook.yml'] = lefthookYml(cfg);
       // `|| true` so `npm install` doesn't fail before `git init` — lefthook
       // (unlike husky/simple-git-hooks) errors hard without a .git directory.
       pkg.scripts.prepare = 'lefthook install || true';
@@ -45,7 +45,7 @@ export default {
   },
 };
 
-function lefthookYml(cfg, staged) {
+function lefthookYml(cfg) {
   const cmd =
     cfg.lint === 'biome'
       ? 'biome check --write --no-errors-on-unmatched {staged_files}'
