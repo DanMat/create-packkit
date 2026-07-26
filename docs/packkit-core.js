@@ -352,7 +352,18 @@ function normalizeConfig(input = {}, diagnostics = null) {
   if (!(cfg.hasService || cfg.hasCli)) coerce("env", false, "ENV_REQUIRES_SERVICE_OR_CLI", "Env validation was disabled because it only applies to a service or CLI.");
   if (cfg.release !== "changesets") coerce("canary", false, "CANARY_REQUIRES_CHANGESETS", "Canary releases were disabled because they require the Changesets release flow.");
   if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) coerce("jsr", false, "JSR_REQUIRES_PLAIN_TS_LIBRARY", "JSR publishing was disabled because it applies only to a plain TypeScript library.");
+  cfg.resolved = resolvedView(cfg);
   return cfg;
+}
+function resolvedView(cfg) {
+  return {
+    targets: { library: cfg.hasLibrary, cli: cfg.hasCli, service: cfg.hasService, app: cfg.hasApp },
+    language: { typescript: cfg.isTs, ext: cfg.ext, srcExt: cfg.srcExt },
+    framework: { name: cfg.framework, react: cfg.isReact, vue: cfg.isVue, svelte: cfg.isSvelte, any: cfg.hasFramework },
+    build: { vite: cfg.viteBuild, custom: cfg.customBuild, usesVite: cfg.usesVite, has: cfg.hasBuild },
+    module: { format: cfg.moduleFormat, esm: cfg.hasEsm, cjs: cfg.hasCjs },
+    package: { publishable: cfg.publishable, monorepo: cfg.monorepo }
+  };
 }
 
 // src/core/render.js

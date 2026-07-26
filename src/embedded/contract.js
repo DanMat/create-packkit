@@ -13,15 +13,17 @@
 export function deriveDeploymentContract(cfg) {
   const run = (script) => (cfg.packageManager === 'npm' ? `npm run ${script}` : `${cfg.packageManager} ${script}`);
   const start = cfg.packageManager === 'npm' ? 'npm start' : `${cfg.packageManager} start`;
+  // Read the structured resolved view rather than re-interpreting raw selections.
+  const { targets, build } = cfg.resolved;
 
-  if (cfg.hasService) {
+  if (targets.service) {
     // The generated server reads PORT but defaults to 3000, so PORT is optional,
     // not required — `port` communicates the default and the `PORT` env var
     // overrides it. `healthCheckPath` is only asserted because every service
     // framework Packkit generates (Hono/Fastify/Express) defines /health.
     return prune({
       type: 'node-service',
-      buildCommand: cfg.hasBuild ? run('build') : undefined,
+      buildCommand: build.has ? run('build') : undefined,
       startCommand: start,
       port: 3000,
       healthCheckPath: '/health',
@@ -29,7 +31,7 @@ export function deriveDeploymentContract(cfg) {
     });
   }
 
-  if (cfg.hasApp) {
+  if (targets.app) {
     return prune({
       type: 'static',
       buildCommand: run('build'),
@@ -38,16 +40,16 @@ export function deriveDeploymentContract(cfg) {
     });
   }
 
-  if (cfg.hasCli) {
+  if (targets.cli) {
     return prune({
       type: 'cli',
-      buildCommand: cfg.hasBuild ? run('build') : undefined,
+      buildCommand: build.has ? run('build') : undefined,
     });
   }
 
   return prune({
     type: 'library',
-    buildCommand: cfg.hasBuild ? run('build') : undefined,
+    buildCommand: build.has ? run('build') : undefined,
   });
 }
 
