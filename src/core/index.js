@@ -22,23 +22,49 @@ export function fromPreset(name, overrides = {}) {
   return cfg;
 }
 
-/** Turn a config into a complete set of files. */
-export function generate(input) {
-  const cfg = normalizeConfig(input);
-  if (cfg.monorepo) return buildMonorepo(cfg);
-
+/**
+ * Run every active feature, collecting its files and package.json fragment.
+ * Returns the raw material — file map, the fragments in contribution order,
+ * and which feature produced each file — so callers that need provenance (the
+ * embedded API's collision detection) get it without a second pass, while
+ * `generate` folds it into the same output as before.
+ */
+export function assemble(cfg) {
   const files = {};
+  const fileSources = {};
+  const fragments = [];
   let pkg = {};
 
   for (const feat of features) {
     if (!feat.active(cfg)) continue;
     const out = feat.apply(cfg) || {};
     if (out.files) {
-      for (const [path, contents] of Object.entries(out.files)) files[path] = contents;
+      for (const [path, contents] of Object.entries(out.files)) {
+        (fileSources[path] ||= []).push(feat.id);
+        files[path] = contents;
+      }
     }
-    if (out.pkg) pkg = deepMerge(pkg, out.pkg);
+    if (out.pkg) {
+      fragments.push({ source: feat.id, pkg: out.pkg });
+      pkg = deepMerge(pkg, out.pkg);
+    }
+  }
+  return { files, fileSources, fragments, pkg };
+}
+
+/**
+ * Generate, keeping the provenance assemble() produced. One assembly pass feeds
+ * both the public files and the embedded API's conflict diagnostics, so the
+ * bytes callers get and the provenance they inspect come from the same run.
+ */
+export function generateTracked(input, diagnostics = null) {
+  const cfg = normalizeConfig(input, diagnostics);
+  if (cfg.monorepo) {
+    // The monorepo generator is a separate path with no per-feature fragments.
+    return { ...buildMonorepo(cfg), fileSources: {}, fragments: [] };
   }
 
+  const { files, fileSources, fragments, pkg } = assemble(cfg);
   files['package.json'] = toJson(finalizePackageJson(pkg));
   files['packkit.json'] = provenance(cfg);
 
@@ -47,7 +73,15 @@ export function generate(input) {
     files,
     postCommands: postCommands(cfg),
     summary: summarize(cfg, files),
+    fileSources,
+    fragments,
   };
+}
+
+/** Turn a config into a complete set of files. */
+export function generate(input) {
+  const { config, files, postCommands, summary } = generateTracked(input);
+  return { config, files, postCommands, summary };
 }
 
 function postCommands(cfg) {

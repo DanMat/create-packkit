@@ -301,20 +301,32 @@ function defaultConfig() {
   }
   return cfg;
 }
-function normalizeConfig(input = {}) {
+function normalizeConfig(input = {}, diagnostics = null) {
   const cfg = { ...defaultConfig(), ...input };
-  if (!Array.isArray(cfg.target) || cfg.target.length === 0) cfg.target = ["library"];
-  if (!Array.isArray(cfg.workflows)) cfg.workflows = [];
-  if (cfg.bundler === "none") cfg.minify = false;
-  if (cfg.test === "none" || cfg.test === "node") cfg.coverage = false;
-  if (cfg.workflows.includes("codecov")) cfg.coverage = true;
+  const requested = new Set(Object.keys(input));
+  const coerce = (field, value, code, message, severity = "warning") => {
+    const same = JSON.stringify(cfg[field]) === JSON.stringify(value);
+    if (same) return;
+    const previousValue = cfg[field];
+    cfg[field] = value;
+    if (diagnostics && requested.has(field)) {
+      diagnostics.push({ severity, code, field, previousValue, resolvedValue: value, message, source: "normalize" });
+    }
+  };
+  if (!Array.isArray(cfg.target) || cfg.target.length === 0) {
+    coerce("target", ["library"], "TARGET_DEFAULTED", 'No target was given, so "library" was used.', "info");
+  }
+  if (!Array.isArray(cfg.workflows)) coerce("workflows", [], "WORKFLOWS_DEFAULTED", "workflows was not a list, so it was reset to none.", "info");
+  if (cfg.bundler === "none") coerce("minify", false, "MINIFY_REQUIRES_BUNDLER", "Minify was disabled because no bundler produces output to minify.");
+  if (cfg.test === "none" || cfg.test === "node") coerce("coverage", false, "COVERAGE_UNSUPPORTED_RUNNER", `Coverage was disabled because the "${cfg.test}" test runner does not report it.`);
+  if (cfg.workflows.includes("codecov")) coerce("coverage", true, "COVERAGE_FORCED_BY_CODECOV", "Coverage was enabled because the Codecov workflow requires it.", "info");
   cfg.isReact = cfg.framework === "react";
   cfg.isVue = cfg.framework === "vue";
   cfg.isSvelte = cfg.framework === "svelte";
   cfg.hasFramework = cfg.framework !== "none";
   cfg.hasApp = cfg.target.includes("app");
   if (cfg.hasFramework && !cfg.hasApp && !cfg.target.includes("library")) {
-    cfg.target = ["library", ...cfg.target];
+    coerce("target", ["library", ...cfg.target], "TARGET_LIBRARY_ADDED", 'A "library" target was added because a component framework needs something to build.', "info");
   }
   cfg.isTs = cfg.language === "ts";
   cfg.ext = cfg.isTs ? "ts" : "js";
@@ -327,23 +339,24 @@ function normalizeConfig(input = {}) {
   cfg.customBuild = cfg.viteBuild || cfg.svelteLib;
   cfg.usesVite = cfg.viteBuild || cfg.isSvelte;
   cfg.hasBuild = cfg.viteBuild || !cfg.svelteLib && (cfg.bundler !== "none" || cfg.isTs);
-  if (cfg.hasApp) cfg.moduleFormat = "esm";
+  if (cfg.hasApp) coerce("moduleFormat", "esm", "MODULE_FORMAT_FORCED_FOR_APP", "An app is bundled, not published, so its module format is ESM.", "info");
   cfg.hasEsm = cfg.moduleFormat === "esm" || cfg.moduleFormat === "dual";
   cfg.hasCjs = cfg.moduleFormat === "cjs" || cfg.moduleFormat === "dual";
-  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) cfg.storybook = false;
-  if (!cfg.hasApp) cfg.e2e = false;
+  if (!cfg.hasFramework || cfg.hasApp || !cfg.hasLibrary) coerce("storybook", false, "STORYBOOK_REQUIRES_COMPONENT_LIBRARY", "Storybook was disabled because it only applies to a component library.");
+  if (!cfg.hasApp) coerce("e2e", false, "E2E_REQUIRES_APP", "End-to-end tests were disabled because they only apply to an app target.");
   if (cfg.monorepo) cfg.hasBuild = true;
   cfg.publishable = (cfg.hasLibrary || cfg.hasCli) && !cfg.hasApp && !cfg.hasService;
-  if (!cfg.publishable) cfg.pkgChecks = false;
-  if (!cfg.publishable) cfg.sourcemaps = false;
-  if (!(cfg.publishable && cfg.hasBuild)) cfg.sizeLimit = false;
-  if (!(cfg.hasService || cfg.hasCli)) cfg.env = false;
-  if (cfg.release !== "changesets") cfg.canary = false;
-  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) cfg.jsr = false;
+  if (!cfg.publishable) coerce("pkgChecks", false, "PKG_CHECKS_REQUIRES_PUBLISHABLE", "Package-correctness checks were disabled because this project is not published to npm.");
+  if (!cfg.publishable) coerce("sourcemaps", false, "SOURCEMAPS_REQUIRES_PUBLISHABLE", "Sourcemaps were disabled because this project is not published to npm.");
+  if (!(cfg.publishable && cfg.hasBuild)) coerce("sizeLimit", false, "SIZE_LIMIT_REQUIRES_BUILT_LIBRARY", "The bundle-size budget was disabled because it needs a published package with a build.");
+  if (!(cfg.hasService || cfg.hasCli)) coerce("env", false, "ENV_REQUIRES_SERVICE_OR_CLI", "Env validation was disabled because it only applies to a service or CLI.");
+  if (cfg.release !== "changesets") coerce("canary", false, "CANARY_REQUIRES_CHANGESETS", "Canary releases were disabled because they require the Changesets release flow.");
+  if (!(cfg.isTs && cfg.hasLibrary && !cfg.hasFramework && !cfg.hasApp)) coerce("jsr", false, "JSR_REQUIRES_PLAIN_TS_LIBRARY", "JSR publishing was disabled because it applies only to a plain TypeScript library.");
   return cfg;
 }
 
 // src/core/render.js
+var UNSAFE_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
 function deepMerge(target, source) {
   if (Array.isArray(target) && Array.isArray(source)) {
     return [.../* @__PURE__ */ new Set([...target, ...source])];
@@ -351,6 +364,7 @@ function deepMerge(target, source) {
   if (isPlainObject(target) && isPlainObject(source)) {
     const out = { ...target };
     for (const [k, v] of Object.entries(source)) {
+      if (UNSAFE_KEYS.has(k)) continue;
       out[k] = k in target ? deepMerge(target[k], v) : v;
     }
     return out;
@@ -3052,27 +3066,47 @@ function fromPreset(name, overrides = {}) {
   cfg.preset = canonical;
   return cfg;
 }
-function generate(input) {
-  const cfg = normalizeConfig(input);
-  if (cfg.monorepo) return buildMonorepo(cfg);
+function assemble(cfg) {
   const files = {};
+  const fileSources = {};
+  const fragments = [];
   let pkg = {};
   for (const feat of features_default) {
     if (!feat.active(cfg)) continue;
     const out = feat.apply(cfg) || {};
     if (out.files) {
-      for (const [path, contents] of Object.entries(out.files)) files[path] = contents;
+      for (const [path, contents] of Object.entries(out.files)) {
+        (fileSources[path] ||= []).push(feat.id);
+        files[path] = contents;
+      }
     }
-    if (out.pkg) pkg = deepMerge(pkg, out.pkg);
+    if (out.pkg) {
+      fragments.push({ source: feat.id, pkg: out.pkg });
+      pkg = deepMerge(pkg, out.pkg);
+    }
   }
+  return { files, fileSources, fragments, pkg };
+}
+function generateTracked(input, diagnostics = null) {
+  const cfg = normalizeConfig(input, diagnostics);
+  if (cfg.monorepo) {
+    return { ...buildMonorepo(cfg), fileSources: {}, fragments: [] };
+  }
+  const { files, fileSources, fragments, pkg } = assemble(cfg);
   files["package.json"] = toJson(finalizePackageJson(pkg));
   files["packkit.json"] = provenance(cfg);
   return {
     config: cfg,
     files,
     postCommands: postCommands(cfg),
-    summary: summarize(cfg, files)
+    summary: summarize(cfg, files),
+    fileSources,
+    fragments
   };
+}
+function generate(input) {
+  const { config, files, postCommands: postCommands2, summary } = generateTracked(input);
+  return { config, files, postCommands: postCommands2, summary };
 }
 function postCommands(cfg) {
   const install = {
@@ -3110,9 +3144,11 @@ export {
   PRESET_ALIASES,
   PRESET_INFO,
   PRESET_NAMES,
+  assemble,
   defaultConfig,
   fromPreset,
   generate,
+  generateTracked,
   normalizeConfig,
   resolvePreset
 };
