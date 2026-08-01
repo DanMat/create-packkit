@@ -78,6 +78,27 @@ export function planUpgrade({ generated, onDisk }) {
   };
 }
 
+/**
+ * Count a plan into safe (additive, applied by default), review (differs,
+ * preserved by default), and conflict (both-changed; only detectable with a
+ * baseline, so 0 today). Used for the metadata summary and --json output.
+ */
+export function summarizeUpgrade(plan) {
+  const p = plan.packageJson;
+  const depCount = (m) => DEP_SECTIONS.reduce((n, s) => n + Object.keys(m[s]).length, 0);
+  const safeChanges =
+    plan.files.added.length +
+    Object.keys(p.addedScripts).length +
+    depCount(p.addedDependencies) +
+    p.addedFields.length;
+  const reviewChanges =
+    plan.files.changed.length +
+    Object.keys(p.changedScripts).length +
+    depCount(p.changedDependencies) +
+    p.changedFields.length;
+  return { safeChanges, reviewChanges, conflicts: 0 };
+}
+
 /** True when a plan found nothing to bring in. */
 export function isUpgradeEmpty(plan) {
   const p = plan.packageJson;

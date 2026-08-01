@@ -12,8 +12,11 @@
 import { parseArgs } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { createProject, planUpgrade, isUpgradeEmpty, buildUpgradeWrite } from '../embedded/index.js';
+import { createProject, planUpgrade, isUpgradeEmpty, buildUpgradeWrite, summarizeUpgrade } from '../embedded/index.js';
 import { writeGeneratedProject } from '../embedded/writer.js';
+
+// Bumped if the --json output shape changes incompatibly.
+const JSON_SCHEMA_VERSION = 1;
 
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
@@ -32,6 +35,7 @@ Options:
   --replace-files    With --apply, replace files that differ
   --update-scripts   With --apply, replace scripts that differ
   --update-deps      With --apply, replace dependency versions that differ
+  --json             Print the plan as JSON (machine-readable; no other output)
   -h, --help         Show this help
 
 Without --apply this is a dry run — it only reports.
@@ -49,6 +53,7 @@ export async function runUpgrade(argv) {
       'replace-files': { type: 'boolean' },
       'update-scripts': { type: 'boolean' },
       'update-deps': { type: 'boolean' },
+      json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -57,7 +62,9 @@ export async function runUpgrade(argv) {
   const dir = resolve(positionals[0] || '.');
   const provPath = join(dir, 'packkit.json');
   if (!existsSync(provPath)) {
-    console.error(`No packkit.json in "${dir}". Upgrade only works on a project Packkit scaffolded.`);
+    const msg = `No packkit.json in "${dir}". Upgrade only works on a project Packkit scaffolded.`;
+    if (values.json) { console.log(JSON.stringify({ schemaVersion: JSON_SCHEMA_VERSION, error: msg }, null, 2)); return; }
+    console.error(msg);
     process.exit(1);
   }
 
@@ -90,6 +97,12 @@ export async function runUpgrade(argv) {
   }
 
   const plan = planUpgrade({ generated: project.files, onDisk });
+
+  // Machine-readable mode: emit only JSON, never a human log line.
+  if (values.json) {
+    console.log(JSON.stringify(jsonReport(plan, fromVersion, toVersion), null, 2));
+    return;
+  }
 
   if (isUpgradeEmpty(plan)) {
     console.log(`Already current with Packkit ${toVersion}. Nothing to upgrade.`);
@@ -131,6 +144,33 @@ export async function runUpgrade(argv) {
   if (preserved.length) {
     console.log('\nPreserved (differs from the current template — likely your own changes):\n  ' + preserved.join('\n  '));
   }
+}
+
+// A versioned, machine-readable view of the plan for portals/automation.
+function jsonReport(plan, fromVersion, toVersion) {
+  const files = [
+    ...plan.files.added.map((path) => ({ path, status: 'new-generated-file', safeToApply: true })),
+    ...plan.files.changed.map((path) => ({ path, status: 'changed', safeToApply: false })),
+  ];
+  return {
+    schemaVersion: JSON_SCHEMA_VERSION,
+    fromPackkitVersion: fromVersion,
+    toPackkitVersion: toVersion,
+    // Baseline (three-way) metadata isn't stored yet, so changed values can't be
+    // classified as user-vs-template.
+    baselineAvailable: false,
+    summary: summarizeUpgrade(plan),
+    files,
+    packageJson: plan.packageJson,
+    diagnostics: [
+      {
+        severity: 'warning',
+        code: 'UPGRADE_BASELINE_UNAVAILABLE',
+        message: 'This project has no baseline metadata; values that differ are preserved and need manual review.',
+        source: 'upgrade',
+      },
+    ],
+  };
 }
 
 function readName(dir) {

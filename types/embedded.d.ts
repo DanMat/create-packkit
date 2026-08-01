@@ -140,7 +140,39 @@ export interface UpgradeApplyPolicy {
 
 export const DEFAULT_UPGRADE_POLICY: Readonly<UpgradeApplyPolicy>;
 
+export interface UpgradeSummary {
+  safeChanges: number;
+  reviewChanges: number;
+  conflicts: number;
+}
+
+export interface UpgradeProjectInput {
+  definition: PackkitProjectDefinition;
+  currentFiles: Record<string, string>;
+  currentPackageJson?: Record<string, unknown>;
+  policy?: Partial<UpgradeApplyPolicy>;
+}
+
+export interface ProjectUpgradeResult {
+  generatedProject: GeneratedProject;
+  plan: UpgradePlan;
+  patch: Record<string, string>;
+  diagnostics: Diagnostic[];
+  metadata: {
+    fromPackkitVersion?: string;
+    toPackkitVersion: string;
+    baselineAvailable: boolean;
+    hasConflicts: boolean;
+    hasSafeChanges: boolean;
+  };
+}
+
+/** In-memory upgrade orchestration for host apps: recreate, diff, and build a
+ *  patch under a policy. No filesystem, git, network, or command execution. */
+export function upgradeProject(input: UpgradeProjectInput): ProjectUpgradeResult;
+
 export function planUpgrade(input: { generated: Record<string, string>; onDisk: Record<string, string | undefined> }): UpgradePlan;
+export function summarizeUpgrade(plan: UpgradePlan): UpgradeSummary;
 export function isUpgradeEmpty(plan: UpgradePlan): boolean;
 export function buildUpgradeWrite(input: {
   generated: Record<string, string>;

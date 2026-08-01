@@ -140,3 +140,45 @@ test('end-to-end: regenerate from packkit.json reproduces the project (nothing t
   const plan = planUpgrade({ generated: rebuilt.files, onDisk: project.files });
   assert.equal(isUpgradeEmpty(plan), true);
 });
+
+// ---- upgradeProject (embedded orchestration) -------------------------------
+
+import { upgradeProject, exportProjectDefinition, summarizeUpgrade } from '../src/embedded/index.js';
+
+test('upgradeProject: recreates, diffs, and builds a patch — purely in memory', () => {
+  const project = createProject({ preset: 'ts-lib', name: 'lib' });
+  const definition = exportProjectDefinition(project);
+  // simulate a repo missing one generated file and with an edited README
+  const currentFiles = { ...project.files };
+  delete currentFiles['.editorconfig'];
+  currentFiles['README.md'] = 'my edited readme\n';
+
+  const result = upgradeProject({ definition, currentFiles });
+  assert.ok(result.generatedProject.files['package.json']);
+  assert.equal(result.patch['.editorconfig'], project.files['.editorconfig'], 'missing file in the patch');
+  assert.equal(result.patch['README.md'], undefined, 'edited file preserved (default policy)');
+  assert.equal(result.metadata.baselineAvailable, false);
+  assert.ok(result.diagnostics.some((d) => d.code === 'UPGRADE_BASELINE_UNAVAILABLE'));
+  assert.equal(result.metadata.hasSafeChanges, true);
+});
+
+test('upgradeProject: an up-to-date repo yields an empty patch', () => {
+  const project = createProject({ preset: 'node-service', name: 'svc' });
+  const result = upgradeProject({ definition: exportProjectDefinition(project), currentFiles: project.files });
+  assert.deepEqual(result.patch, {});
+  assert.equal(result.metadata.hasSafeChanges, false);
+});
+
+test('upgradeProject: requires currentFiles', () => {
+  const project = createProject({ preset: 'ts-lib', name: 'lib' });
+  assert.throws(() => upgradeProject({ definition: exportProjectDefinition(project) }), /currentFiles/);
+});
+
+test('summarizeUpgrade counts additive vs review changes', () => {
+  const generated = { 'a.txt': 'A', 'b.txt': 'B', 'package.json': pkg({ scripts: { test: 'vitest' } }) };
+  const onDisk = { 'a.txt': undefined, 'b.txt': 'edited', 'package.json': pkg({ scripts: {} }) };
+  const s = summarizeUpgrade(planUpgrade({ generated, onDisk }));
+  assert.equal(s.safeChanges, 2); // a.txt added + test script added
+  assert.equal(s.reviewChanges, 1); // b.txt changed
+  assert.equal(s.conflicts, 0);
+});
