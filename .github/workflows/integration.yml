@@ -38,6 +38,8 @@ jobs:
           - node-service
           - monorepo
           - fullstack
+          - fullstack --server express
+          - fullstack --server fastify
           - oss
           # Embedded API — generate through createProject/writeGeneratedProject,
           # add a deploy file, and confirm the same install/build/test/lint pass.

@@ -52,7 +52,7 @@ export async function runWizard(seed = {}) {
   }
   cfg.packageManager = bail(await p.select({ message: 'Package manager', options: asOptions('packageManager'), initialValue: OPTIONS.packageManager.default }));
   cfg.bundler = bail(await p.select({ message: 'Build / bundler', options: asOptions('bundler'), initialValue: OPTIONS.bundler.default }));
-  if (cfg.target.includes('service')) {
+  if (cfg.target.includes('service') || cfg.monorepoLayout === 'fullstack') {
     cfg.serviceFramework = bail(await p.select({ message: 'Service framework', options: asOptions('serviceFramework'), initialValue: OPTIONS.serviceFramework.default }));
   }
   cfg.test = bail(await p.select({ message: 'Test runner', options: asOptions('test'), initialValue: OPTIONS.test.default }));

@@ -47,7 +47,9 @@ var OPTIONS = {
     type: "select",
     label: "Service framework (HTTP service)",
     default: "hono",
-    when: (cfg) => cfg.target?.includes("service"),
+    // Applies to the service target, and to the fullstack monorepo (whose
+    // apps/server honors it too).
+    when: (cfg) => cfg.target?.includes("service") || cfg.monorepoLayout === "fullstack",
     choices: [
       { value: "hono", label: "Hono (fast, web-standard)" },
       { value: "fastify", label: "Fastify" },
@@ -262,7 +264,7 @@ var OPTION_HELP = {
   moduleFormat: "How the package is consumed. ESM-only (default) is the modern, leanest choice \u2014 Node 20.19+/22.12+ can `require()` ESM. Pick dual only if you must support older CJS-only consumers; cjs-only is rarely needed.",
   target: "What you are building \u2014 mix and match: a library (importable package), a CLI (ships a bin), an HTTP service, or an app (Vite SPA).",
   serviceFramework: "For the service target: Hono (fast, web-standard, tiny \u2014 default), Fastify (batteries-included, plugins, schema validation), or Express (ubiquitous, huge ecosystem).",
-  monorepoLayout: 'What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono) + packages/shared, wired together, with the server serving the web build in production.',
+  monorepoLayout: 'What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono by default; --server for Fastify/Express) + packages/shared, wired together, with the server serving the web build in production.',
   monorepo: "Generate a pnpm + Turborepo workspace with two linked example packages and Changesets. Only worth it when \u22652 packages share code.",
   framework: "UI framework for component libraries and apps: React, Vue, or Svelte (or none for a plain package).",
   packageManager: "Which package manager the scripts, lockfile, and CI target: npm, pnpm, yarn, or bun.",
@@ -673,6 +675,7 @@ var V = {
   hono: "^4.5.0",
   "@hono/node-server": "^2.0.0",
   fastify: "^5.0.0",
+  "@fastify/static": "^8.0.0",
   express: "^5.0.0",
   "@types/express": "^5.0.0",
   zod: "^4.0.0"
@@ -2660,6 +2663,8 @@ function buildFullstack(cfg) {
     `import { describeHealth } from './index.js';`,
     `expect(describeHealth({ ok: true, service: 'api', uptime: 12 })).toBe('api is up (12s)')`
   );
+  const fw = cfg.serviceFramework || "hono";
+  const server = fullstackServer(cfg, fw, shared);
   files["apps/server/package.json"] = toJson({
     name: `@${scope}/server`,
     version: "0.0.0",
@@ -2673,52 +2678,13 @@ function buildFullstack(cfg) {
       typecheck: "tsc --noEmit",
       lint: "eslint ."
     },
-    dependencies: { hono: V.hono, "@hono/node-server": V["@hono/node-server"], [shared]: wsProto },
-    devDependencies: { tsx: V.tsx, tsup: V.tsup }
+    dependencies: { ...server.deps, [shared]: wsProto },
+    devDependencies: { tsx: V.tsx, tsup: V.tsup, ...server.devDeps }
   });
   files["apps/server/tsconfig.json"] = toJson({ extends: "../../tsconfig.base.json", include: ["src"] });
-  files["apps/server/src/app.ts"] = [
-    `import { Hono } from 'hono';`,
-    `import { serveStatic } from '@hono/node-server/serve-static';`,
-    `import type { Health } from '${shared}';`,
-    ``,
-    `export const app = new Hono();`,
-    ``,
-    `app.get('/api/health', (c) => {`,
-    `	const body: Health = { ok: true, service: '${cfg.name}', uptime: process.uptime() };`,
-    `	return c.json(body);`,
-    `});`,
-    ``,
-    `// In production the API also serves the built web app, so one process and`,
-    `// one port covers the whole thing. In dev, Vite serves the app and proxies`,
-    `// /api here instead (see apps/web/vite.config.ts).`,
-    `if (process.env.NODE_ENV === 'production') {`,
-    `	app.use('/*', serveStatic({ root: '../web/dist' }));`,
-    `}`,
-    ``
-  ].join("\n");
-  files["apps/server/src/index.ts"] = [
-    `import { serve } from '@hono/node-server';`,
-    `import { app } from './app.js';`,
-    ``,
-    `const port = Number(process.env.PORT ?? 3000);`,
-    `serve({ fetch: app.fetch, port });`,
-    `console.log(\`Listening on http://localhost:\${port}\`);`,
-    ``
-  ].join("\n");
-  files["apps/server/src/app.test.ts"] = [
-    `import { describe, it, expect } from 'vitest';`,
-    `import { app } from './app.js';`,
-    ``,
-    `describe('api', () => {`,
-    `	it('reports health', async () => {`,
-    `		const res = await app.request('/api/health');`,
-    `		expect(res.status).toBe(200);`,
-    `		expect(await res.json()).toMatchObject({ ok: true });`,
-    `	});`,
-    `});`,
-    ``
-  ].join("\n");
+  files["apps/server/src/app.ts"] = server.appTs;
+  files["apps/server/src/index.ts"] = server.indexTs;
+  files["apps/server/src/app.test.ts"] = server.appTestTs;
   files["apps/web/package.json"] = toJson({
     name: `@${scope}/web`,
     version: "0.0.0",
@@ -2834,14 +2800,156 @@ function buildFullstack(cfg) {
     summary: {
       name: cfg.name,
       fileCount: Object.keys(files).length,
-      stack: ["monorepo", "full-stack", `${pm}+turbo`, "React+Vite", "Hono", "TypeScript", "vitest"],
+      stack: ["monorepo", "full-stack", `${pm}+turbo`, "React+Vite", { hono: "Hono", fastify: "Fastify", express: "Express" }[cfg.serviceFramework || "hono"], "TypeScript", "vitest"],
       workflows: ["ci"]
     }
+  };
+}
+function fullstackServer(cfg, fw, shared) {
+  const healthBody = `{ ok: true, service: '${cfg.name}', uptime: process.uptime() }`;
+  if (fw === "fastify") {
+    return {
+      deps: { fastify: V.fastify, "@fastify/static": V["@fastify/static"] },
+      devDeps: {},
+      appTs: [
+        `import Fastify from 'fastify';`,
+        `import fastifyStatic from '@fastify/static';`,
+        `import { resolve } from 'node:path';`,
+        `import type { Health } from '${shared}';`,
+        ``,
+        `export const app = Fastify();`,
+        ``,
+        `app.get('/api/health', async (): Promise<Health> => (${healthBody}));`,
+        ``,
+        `// In production the API also serves the built web app, so one process and`,
+        `// one port covers the whole thing. In dev, Vite serves the app and proxies`,
+        `// /api here instead (see apps/web/vite.config.ts).`,
+        `if (process.env.NODE_ENV === 'production') {`,
+        `	app.register(fastifyStatic, { root: resolve('../web/dist') });`,
+        `}`,
+        ``
+      ].join("\n"),
+      indexTs: [
+        `import { app } from './app.js';`,
+        ``,
+        `const port = Number(process.env.PORT ?? 3000);`,
+        `app.listen({ port, host: '0.0.0.0' }).then((url) => console.log(\`Listening on \${url}\`));`,
+        ``
+      ].join("\n"),
+      appTestTs: [
+        `import { describe, it, expect } from 'vitest';`,
+        `import { app } from './app.js';`,
+        ``,
+        `describe('api', () => {`,
+        `	it('reports health', async () => {`,
+        `		const res = await app.inject({ method: 'GET', url: '/api/health' });`,
+        `		expect(res.statusCode).toBe(200);`,
+        `		expect(res.json()).toMatchObject({ ok: true });`,
+        `	});`,
+        `});`,
+        ``
+      ].join("\n")
+    };
+  }
+  if (fw === "express") {
+    return {
+      deps: { express: V.express },
+      devDeps: { "@types/express": V["@types/express"], supertest: V.supertest, "@types/supertest": V["@types/supertest"] },
+      appTs: [
+        // Annotate the app type: the workspace tsconfig emits declarations, and
+        // express()'s inferred type references a transitive package (TS2742).
+        `import express, { type Express } from 'express';`,
+        `import type { Health } from '${shared}';`,
+        ``,
+        `export const app: Express = express();`,
+        ``,
+        `app.get('/api/health', (_req, res) => {`,
+        `	const body: Health = ${healthBody};`,
+        `	res.json(body);`,
+        `});`,
+        ``,
+        `// In production the API also serves the built web app, so one process and`,
+        `// one port covers the whole thing. In dev, Vite serves the app and proxies`,
+        `// /api here instead (see apps/web/vite.config.ts).`,
+        `if (process.env.NODE_ENV === 'production') {`,
+        `	app.use(express.static('../web/dist'));`,
+        `}`,
+        ``
+      ].join("\n"),
+      indexTs: [
+        `import { app } from './app.js';`,
+        ``,
+        `const port = Number(process.env.PORT ?? 3000);`,
+        `app.listen(port, () => console.log(\`Listening on http://localhost:\${port}\`));`,
+        ``
+      ].join("\n"),
+      appTestTs: [
+        `import { describe, it, expect } from 'vitest';`,
+        `import request from 'supertest';`,
+        `import { app } from './app.js';`,
+        ``,
+        `describe('api', () => {`,
+        `	it('reports health', async () => {`,
+        `		const res = await request(app).get('/api/health');`,
+        `		expect(res.status).toBe(200);`,
+        `		expect(res.body).toMatchObject({ ok: true });`,
+        `	});`,
+        `});`,
+        ``
+      ].join("\n")
+    };
+  }
+  return {
+    deps: { hono: V.hono, "@hono/node-server": V["@hono/node-server"] },
+    devDeps: {},
+    appTs: [
+      `import { Hono } from 'hono';`,
+      `import { serveStatic } from '@hono/node-server/serve-static';`,
+      `import type { Health } from '${shared}';`,
+      ``,
+      `export const app = new Hono();`,
+      ``,
+      `app.get('/api/health', (c) => {`,
+      `	const body: Health = ${healthBody};`,
+      `	return c.json(body);`,
+      `});`,
+      ``,
+      `// In production the API also serves the built web app, so one process and`,
+      `// one port covers the whole thing. In dev, Vite serves the app and proxies`,
+      `// /api here instead (see apps/web/vite.config.ts).`,
+      `if (process.env.NODE_ENV === 'production') {`,
+      `	app.use('/*', serveStatic({ root: '../web/dist' }));`,
+      `}`,
+      ``
+    ].join("\n"),
+    indexTs: [
+      `import { serve } from '@hono/node-server';`,
+      `import { app } from './app.js';`,
+      ``,
+      `const port = Number(process.env.PORT ?? 3000);`,
+      `serve({ fetch: app.fetch, port });`,
+      `console.log(\`Listening on http://localhost:\${port}\`);`,
+      ``
+    ].join("\n"),
+    appTestTs: [
+      `import { describe, it, expect } from 'vitest';`,
+      `import { app } from './app.js';`,
+      ``,
+      `describe('api', () => {`,
+      `	it('reports health', async () => {`,
+      `		const res = await app.request('/api/health');`,
+      `		expect(res.status).toBe(200);`,
+      `		expect(await res.json()).toMatchObject({ ok: true });`,
+      `	});`,
+      `});`,
+      ``
+    ].join("\n")
   };
 }
 function fullstackReadme(cfg, pm, shared) {
   const install = pm === "npm" ? "npm install" : `${pm} install`;
   const run2 = (s) => pm === "npm" ? `npm run ${s}` : `${pm} ${s}`;
+  const serverLabel = { hono: "Hono", fastify: "Fastify", express: "Express" }[cfg.serviceFramework || "hono"];
   return [
     `# ${cfg.name}`,
     "",
@@ -2851,7 +2959,7 @@ function fullstackReadme(cfg, pm, shared) {
     "",
     "```",
     "apps/web       React + Vite front end",
-    "apps/server    Hono API (also serves the web build in production)",
+    `apps/server    ${serverLabel} API (also serves the web build in production)`,
     "packages/shared  types and helpers both sides import",
     "```",
     "",
@@ -3124,7 +3232,7 @@ var PRESET_INFO = {
   "svelte-app": "Svelte SPA \u2014 Vite dev server, build, Testing Library.",
   "node-service": "Node HTTP service (Hono) \u2014 tsx dev, tsup build, Dockerfile.",
   monorepo: "pnpm + Turborepo workspace \u2014 two example packages, Changesets, CI.",
-  fullstack: "Full-stack monorepo \u2014 React+Vite web, Hono API, shared package; server serves the web build in production.",
+  fullstack: "Full-stack monorepo \u2014 React+Vite web, Hono/Fastify/Express API (--server), shared package; server serves the web build in production.",
   oss: "Full open-source library \u2014 coverage, CodeQL, Codecov, Renovate, Changesets.",
   minimal: "Bare TS library \u2014 tsup only, no tests/lint/CI.",
   full: "Everything on \u2014 library + CLI, all workflows and extras."

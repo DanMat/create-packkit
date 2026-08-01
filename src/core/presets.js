@@ -84,7 +84,7 @@ export const PRESET_INFO = {
   'svelte-app': 'Svelte SPA — Vite dev server, build, Testing Library.',
   'node-service': 'Node HTTP service (Hono) — tsx dev, tsup build, Dockerfile.',
   monorepo: 'pnpm + Turborepo workspace — two example packages, Changesets, CI.',
-  fullstack: 'Full-stack monorepo — React+Vite web, Hono API, shared package; server serves the web build in production.',
+  fullstack: 'Full-stack monorepo — React+Vite web, Hono/Fastify/Express API (--server), shared package; server serves the web build in production.',
   oss: 'Full open-source library — coverage, CodeQL, Codecov, Renovate, Changesets.',
   minimal: 'Bare TS library — tsup only, no tests/lint/CI.',
   full: 'Everything on — library + CLI, all workflows and extras.',

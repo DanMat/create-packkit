@@ -98,6 +98,7 @@ export const V = {
   hono: '^4.5.0',
   '@hono/node-server': '^2.0.0',
   fastify: '^5.0.0',
+  '@fastify/static': '^8.0.0',
   express: '^5.0.0',
   '@types/express': '^5.0.0',
   zod: '^4.0.0',

@@ -36,7 +36,9 @@ export const OPTIONS = {
   },
   serviceFramework: {
     group: 'core', type: 'select', label: 'Service framework (HTTP service)', default: 'hono',
-    when: (cfg) => cfg.target?.includes('service'),
+    // Applies to the service target, and to the fullstack monorepo (whose
+    // apps/server honors it too).
+    when: (cfg) => cfg.target?.includes('service') || cfg.monorepoLayout === 'fullstack',
     choices: [
       { value: 'hono', label: 'Hono (fast, web-standard)' },
       { value: 'fastify', label: 'Fastify' },
@@ -218,7 +220,7 @@ export const OPTION_HELP = {
   moduleFormat: 'How the package is consumed. ESM-only (default) is the modern, leanest choice — Node 20.19+/22.12+ can `require()` ESM. Pick dual only if you must support older CJS-only consumers; cjs-only is rarely needed.',
   target: 'What you are building — mix and match: a library (importable package), a CLI (ships a bin), an HTTP service, or an app (Vite SPA).',
   serviceFramework: 'For the service target: Hono (fast, web-standard, tiny — default), Fastify (batteries-included, plugins, schema validation), or Express (ubiquitous, huge ecosystem).',
-  monorepoLayout: 'What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono) + packages/shared, wired together, with the server serving the web build in production.',
+  monorepoLayout: 'What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono by default; --server for Fastify/Express) + packages/shared, wired together, with the server serving the web build in production.',
   monorepo: 'Generate a pnpm + Turborepo workspace with two linked example packages and Changesets. Only worth it when ≥2 packages share code.',
   framework: 'UI framework for component libraries and apps: React, Vue, or Svelte (or none for a plain package).',
   packageManager: 'Which package manager the scripts, lockfile, and CI target: npm, pnpm, yarn, or bun.',
