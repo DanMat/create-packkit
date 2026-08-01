@@ -2,15 +2,20 @@
 // output and report (or apply) what has drifted from Packkit's templates.
 //
 // It reads packkit.json to learn the preset + settings the project came from,
-// regenerates in memory through the embedded API, and diffs against disk. New
-// files and package.json dep/script updates apply cleanly; files that differ
-// are surfaced for review, never overwritten unless explicitly forced.
+// regenerates in memory through the embedded API, and diffs against disk.
+//
+// Safety: `--apply` is non-destructive. It brings in *additions* only — new
+// files, new scripts, new dependencies, new package fields — and preserves
+// anything that already exists but differs (it can't tell a template change
+// from your own edit). Replacing differing values is opt-in per category.
 
 import { parseArgs } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createProject, planUpgrade, isUpgradeEmpty, buildUpgradeWrite } from '../embedded/index.js';
 import { writeGeneratedProject } from '../embedded/writer.js';
+
+const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
 const UPGRADE_HELP = `
 packkit upgrade — pull your project up to Packkit's current templates
@@ -22,11 +27,16 @@ Reads packkit.json in the directory (default: current), regenerates the project
 Packkit would produce today, and shows what changed since you scaffolded.
 
 Options:
-  --apply        Write new files and update package.json / packkit.json
-  --force        With --apply, also overwrite files that differ (review first!)
-  -h, --help     Show this help
+  --apply            Apply the safe, additive changes (new files/scripts/deps)
+  --force            With --apply, also replace everything that differs
+  --replace-files    With --apply, replace files that differ
+  --update-scripts   With --apply, replace scripts that differ
+  --update-deps      With --apply, replace dependency versions that differ
+  -h, --help         Show this help
 
 Without --apply this is a dry run — it only reports.
+By default, anything that already exists and differs is preserved (it might be
+your edit); use the flags above to replace it.
 `;
 
 export async function runUpgrade(argv) {
@@ -36,6 +46,9 @@ export async function runUpgrade(argv) {
     options: {
       apply: { type: 'boolean' },
       force: { type: 'boolean' },
+      'replace-files': { type: 'boolean' },
+      'update-scripts': { type: 'boolean' },
+      'update-deps': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -86,11 +99,18 @@ export async function runUpgrade(argv) {
   report(plan, fromVersion, toVersion);
 
   if (!values.apply) {
-    console.log('\nThis was a dry run. Re-run with --apply to bring in the safe changes.');
+    console.log('\nThis was a dry run. Re-run with --apply to bring in the additive changes.');
     return;
   }
 
-  const writeMap = buildUpgradeWrite({ generated: project.files, onDisk, plan, includeChanged: !!values.force });
+  const policy = {
+    files: values.force || values['replace-files'] ? 'replace-changed' : 'add-only',
+    scripts: values.force || values['update-scripts'] ? 'replace-changed' : 'add-only',
+    dependencies: values.force || values['update-deps'] ? 'replace-changed' : 'add-only',
+    packageFields: values.force ? 'replace-changed' : 'add-only',
+  };
+
+  const writeMap = buildUpgradeWrite({ generated: project.files, onDisk, plan, policy });
   const paths = Object.keys(writeMap);
   if (paths.length) {
     await writeGeneratedProject({
@@ -98,17 +118,18 @@ export async function runUpgrade(argv) {
       destination: dir,
       collisionPolicy: 'overwrite',
     });
-    console.log(`\n✓ Applied ${paths.length} file update${paths.length > 1 ? 's' : ''}.`);
+    console.log(`\n✓ Applied updates to ${paths.length} file${paths.length > 1 ? 's' : ''}.`);
   }
-  const leftover = values.force ? [] : plan.files.changed;
-  if (leftover.length) {
-    const plural = leftover.length > 1;
-    console.log(
-      `\n${leftover.length} file${plural ? 's' : ''} ${plural ? 'differ' : 'differs'} from the current template and ` +
-        `${plural ? 'were' : 'was'} left untouched (they may be your edits):\n  ` +
-        leftover.join('\n  ') +
-        `\nReview them, then re-run with --force to overwrite the ones you want Packkit's version of.`,
-    );
+
+  // Report what was preserved because it differs and the policy didn't replace it.
+  const preserved = [];
+  if (policy.files === 'add-only' && plan.files.changed.length) preserved.push(`${plan.files.changed.length} file(s) — re-run with --replace-files to take Packkit's version`);
+  if (policy.scripts === 'add-only' && Object.keys(plan.packageJson.changedScripts).length) preserved.push(`${Object.keys(plan.packageJson.changedScripts).length} script(s) — --update-scripts`);
+  const changedDepCount = countDeps(plan.packageJson.changedDependencies);
+  if (policy.dependencies === 'add-only' && changedDepCount) preserved.push(`${changedDepCount} dependency version(s) — --update-deps`);
+  if (policy.packageFields === 'add-only' && plan.packageJson.changedFields.length) preserved.push(`${plan.packageJson.changedFields.length} package field(s) — --force`);
+  if (preserved.length) {
+    console.log('\nPreserved (differs from the current template — likely your own changes):\n  ' + preserved.join('\n  '));
   }
 }
 
@@ -120,28 +141,39 @@ function readName(dir) {
   }
 }
 
+function countDeps(map) {
+  return DEP_SECTIONS.reduce((n, s) => n + Object.keys(map[s]).length, 0);
+}
+
+function flattenDeps(map, render) {
+  const out = [];
+  for (const section of DEP_SECTIONS) {
+    for (const [name, change] of Object.entries(map[section])) out.push(render(section, name, change));
+  }
+  return out;
+}
+
 function report(plan, fromVersion, toVersion) {
   console.log(`Packkit ${fromVersion} → ${toVersion}\n`);
   const p = plan.packageJson;
 
-  if (plan.files.added.length) {
-    console.log(`New files (${plan.files.added.length}):\n  ` + plan.files.added.join('\n  '));
-  }
-  const addedDeps = Object.entries(p.addedDependencies);
-  const bumpedDeps = Object.entries(p.updatedDependencies);
-  if (addedDeps.length) {
-    console.log(`\nNew dependencies (${addedDeps.length}):\n  ` + addedDeps.map(([n, d]) => `${n}@${d.version} (${d.map})`).join('\n  '));
-  }
-  if (bumpedDeps.length) {
-    console.log(`\nDependency updates (${bumpedDeps.length}):\n  ` + bumpedDeps.map(([n, d]) => `${n}: ${d.from} → ${d.to}`).join('\n  '));
-  }
+  // Additive — applied by --apply.
+  if (plan.files.added.length) console.log(`New files (${plan.files.added.length}):\n  ` + plan.files.added.join('\n  '));
+  const addedDeps = flattenDeps(p.addedDependencies, (s, n, c) => `${n}@${c.generated} (${s})`);
+  if (addedDeps.length) console.log(`\nNew dependencies (${addedDeps.length}):\n  ` + addedDeps.join('\n  '));
   const addedScripts = Object.keys(p.addedScripts);
-  const changedScripts = Object.entries(p.changedScripts);
   if (addedScripts.length) console.log(`\nNew scripts (${addedScripts.length}):\n  ` + addedScripts.join('\n  '));
-  if (changedScripts.length) {
-    console.log(`\nScript changes (${changedScripts.length}):\n  ` + changedScripts.map(([n, d]) => `${n}: ${d.from} → ${d.to}`).join('\n  '));
-  }
-  if (plan.files.changed.length) {
-    console.log(`\nFiles that differ — review before overwriting (${plan.files.changed.length}):\n  ` + plan.files.changed.join('\n  '));
+  if (p.addedFields.length) console.log(`\nNew package fields (${p.addedFields.length}):\n  ` + p.addedFields.map((f) => f.field).join('\n  '));
+
+  // Differences — preserved by default, need an explicit flag to replace.
+  const changedDeps = flattenDeps(p.changedDependencies, (s, n, c) => `${n}: ${c.current} → ${c.generated} (${s})`);
+  const changedScripts = Object.entries(p.changedScripts);
+  const diffs = [];
+  if (plan.files.changed.length) diffs.push(`Files that differ (${plan.files.changed.length}):\n  ` + plan.files.changed.join('\n  '));
+  if (changedDeps.length) diffs.push(`Dependency versions that differ (${changedDeps.length}):\n  ` + changedDeps.join('\n  '));
+  if (changedScripts.length) diffs.push(`Scripts that differ (${changedScripts.length}):\n  ` + changedScripts.map(([n, c]) => `${n}: ${c.current} → ${c.generated}`).join('\n  '));
+  if (p.changedFields.length) diffs.push(`Package fields that differ (${p.changedFields.length}):\n  ` + p.changedFields.map((f) => f.field).join('\n  '));
+  if (diffs.length) {
+    console.log('\n— Preserved by default (review; these may be your own changes) —\n\n' + diffs.join('\n\n'));
   }
 }
