@@ -26,6 +26,9 @@ const MATRIX = (() => {
   }
   for (const serviceFramework of servers) for (const language of ['ts', 'js']) {
     configs.push({ preset: 'node-service', overrides: { serviceFramework, language, env: true } });
+    // fullstack honors serviceFramework too — exercises @fastify/static and the
+    // express supertest deps in the workspace server.
+    configs.push({ preset: 'fullstack', overrides: { serviceFramework } });
   }
   return configs;
 })();

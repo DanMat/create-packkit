@@ -106,6 +106,7 @@ Every flag, its values (**default** in bold), and what it's for. Prefer the inte
 | `--server` | **hono** · fastify · express | For the service target: Hono (fast, web-standard, tiny — default), Fastify (batteries-included, plugins, schema validation), or Express (ubiquitous, huge ecosystem). |
 | `--target` | **library** · cli · service · app | What you are building — mix and match: a library (importable package), a CLI (ships a bin), an HTTP service, or an app (Vite SPA). |
 | `--monorepo` | on / off (default: **off**) | Generate a pnpm + Turborepo workspace with two linked example packages and Changesets. Only worth it when ≥2 packages share code. |
+| `--monorepo-layout` | **libraries** · fullstack | What the workspace contains. "libraries" gives linked packages you publish (Changesets). "fullstack" gives apps/web (React+Vite) + apps/server (Hono by default; --server for Fastify/Express) + packages/shared, wired together, with the server serving the web build in production. |
 | `--framework` | **none** · react · vue · svelte | UI framework for component libraries and apps: React, Vue, or Svelte (or none for a plain package). |
 | `--pm` | **npm** · pnpm · yarn · bun | Which package manager the scripts, lockfile, and CI target: npm, pnpm, yarn, or bun. |
 | `--node` | 22 · **24** · 26 | Minimum Node line to support. Choices track Node’s own release schedule (Active LTS is the default); this sets engines + .nvmrc. |
@@ -184,6 +185,7 @@ Named bundles of the options above — `npx packkit <preset> <name> -y`.
 | `svelte-app` | `sapp` | Svelte SPA — Vite dev server, build, Testing Library. |
 | `node-service` | `svc`, `service` | Node HTTP service (Hono) — tsx dev, tsup build, Dockerfile. |
 | `monorepo` | — | pnpm + Turborepo workspace — two example packages, Changesets, CI. |
+| `fullstack` | `fs`, `app` | Full-stack monorepo — React+Vite web, Hono/Fastify/Express API (--server), shared package; server serves the web build in production. |
 | `oss` | — | Full open-source library — coverage, CodeQL, Codecov, Renovate, Changesets. |
 | `minimal` | — | Bare TS library — tsup only, no tests/lint/CI. |
 | `full` | — | Everything on — library + CLI, all workflows and extras. |

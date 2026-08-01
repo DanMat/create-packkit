@@ -120,7 +120,7 @@ function commandFor(cfg) {
   // Metadata (previously missing from the command).
   flag('description', 'description'); flag('author', 'author'); flag('keywords', 'keywords'); flag('repo', 'repo');
   flag('language', 'language'); flag('framework', 'framework'); flag('moduleFormat', 'module'); flag('bundler', 'bundler');
-  if (cfg.target.includes('service')) flag('serviceFramework', 'server');
+  if (cfg.target.includes('service') || cfg.monorepoLayout === 'fullstack') flag('serviceFramework', 'server');
   flag('test', 'test'); flag('lint', 'lint'); flag('gitHooks', 'hooks'); flag('release', 'release'); flag('deps', 'deps');
   flag('license', 'license'); flag('packageManager', 'pm'); flag('nodeVersion', 'node');
   if (diff('target')) cfg.target.forEach((t) => parts.push(`--target ${t}`));
@@ -138,6 +138,7 @@ function commandFor(cfg) {
   if (cfg.publishable && cfg.sourcemaps === false) parts.push('--no-sourcemaps');
   if (cfg.coverage === false && (cfg.test === 'vitest' || cfg.test === 'jest')) parts.push('--no-coverage');
   if (cfg.monorepo) parts.push('--monorepo');
+  if (cfg.monorepo && cfg.monorepoLayout && cfg.monorepoLayout !== 'libraries') parts.push(`--monorepo-layout ${cfg.monorepoLayout}`);
   for (const b of ['community', 'agents', 'vscode', 'editorconfig']) {
     if (cfg[b] === false && d[b] === true) parts.push(`--no-${b}`);
   }
