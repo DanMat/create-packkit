@@ -118,4 +118,5 @@ export const HELD = {
   typescript: 'typescript-eslint peers typescript <6.1.0 (no TS 7 support yet)',
   knip: 'v6 crashes on the oxc-parser native binding',
   'lint-staged': 'v17 requires Node >=22.22.1, above our Node 22 engines floor; hold at 16 to keep the Maintenance-LTS line working',
+  jsdom: 'v30 requires Node ^22.22.2 || ^24.15.0, above our Node 22/24 engines floors; hold at 29 so generated projects install on the floor',
 };

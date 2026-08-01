@@ -622,7 +622,7 @@ var V = {
   // test
   vitest: "^4.0.0",
   "@vitest/coverage-v8": "^4.0.0",
-  jsdom: "^29.0.0",
+  jsdom: "^30.0.0",
   jest: "^30.0.0",
   "@types/jest": "^30.0.0",
   "ts-jest": "^29.0.0",
