@@ -68,14 +68,29 @@ inside the project:
 
 ```sh
 npx create-packkit upgrade          # dry run: what's changed since you scaffolded
-npx create-packkit upgrade --apply  # add new files, bump deps, keep your edits
+npx create-packkit upgrade --apply  # bring in the additive changes, keep your edits
 ```
 
-Upgrade regenerates the project Packkit would produce today and reports the
-difference — new files, added or bumped dependencies, new scripts. `--apply`
-brings in the safe changes (your own files, deps, and scripts are preserved);
-files you've edited are listed for review and never overwritten unless you pass
-`--force`.
+Upgrade regenerates the project Packkit would produce today and diffs it against
+disk. **`--apply` is non-destructive**: it brings in *additions* and preserves
+anything that already exists but differs — because without a stored baseline it
+can't tell a template change from your own edit. Replacing differing values is
+opt-in, per category:
+
+| Change                | Default `--apply` | Explicit replacement       |
+| --------------------- | ----------------- | -------------------------- |
+| New file              | Applied           | Applied                    |
+| Changed file          | Preserved         | `--replace-files` (or `--force`) |
+| New script            | Applied           | Applied                    |
+| Changed script        | Preserved         | `--update-scripts` (or `--force`) |
+| New dependency        | Applied           | Applied                    |
+| Changed dependency    | Preserved         | `--update-deps` (or `--force`) |
+| Changed package field | Preserved         | `--force`                  |
+| Removed template file | Reported          | No automatic deletion      |
+
+Your own files, scripts, and dependencies are never touched by `--apply`. The
+report lists everything preserved so you can review it and opt into replacement
+where you want Packkit's version.
 
 ## Or configure it on the web
 

@@ -96,17 +96,55 @@ export function createProjectFromDefinition(
 export function calculateProjectDigest(project: GeneratedProject): string;
 export function deriveDeploymentContract(config: ResolvedPackkitConfig): DeploymentContract;
 
+export type DependencySection = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
+
+export interface DependencyChange {
+  /** Absent when the dependency is newly added. */
+  current?: string;
+  generated: string;
+}
+
+/** Dependency changes keyed by section, then package name — never by name alone. */
+export type DependencyChangeMap = Record<DependencySection, Record<string, DependencyChange>>;
+
+export interface PackageFieldChange {
+  field: string;
+  current?: unknown;
+  generated: unknown;
+}
+
+export interface PackageUpgradePlan {
+  addedScripts: Record<string, string>;
+  changedScripts: Record<string, { current: string; generated: string }>;
+  addedDependencies: DependencyChangeMap;
+  changedDependencies: DependencyChangeMap;
+  addedFields: PackageFieldChange[];
+  changedFields: PackageFieldChange[];
+}
+
 export interface UpgradePlan {
   files: { added: string[]; changed: string[]; unchanged: string[] };
-  packageJson: {
-    addedDependencies: Record<string, { map: string; version: string }>;
-    updatedDependencies: Record<string, { map: string; from: string; to: string }>;
-    addedScripts: Record<string, string>;
-    changedScripts: Record<string, { from: string; to: string }>;
-  };
+  packageJson: PackageUpgradePlan;
   provenanceOutdated: boolean;
 }
 
+export type UpgradeApplyMode = 'add-only' | 'replace-changed';
+
+/** Per-category apply policy. Default is add-only everywhere (non-destructive). */
+export interface UpgradeApplyPolicy {
+  files: UpgradeApplyMode;
+  scripts: UpgradeApplyMode;
+  dependencies: UpgradeApplyMode;
+  packageFields: UpgradeApplyMode;
+}
+
+export const DEFAULT_UPGRADE_POLICY: Readonly<UpgradeApplyPolicy>;
+
 export function planUpgrade(input: { generated: Record<string, string>; onDisk: Record<string, string | undefined> }): UpgradePlan;
 export function isUpgradeEmpty(plan: UpgradePlan): boolean;
-export function buildUpgradeWrite(input: { generated: Record<string, string>; onDisk: Record<string, string | undefined>; plan: UpgradePlan; includeChanged?: boolean }): Record<string, string>;
+export function buildUpgradeWrite(input: {
+  generated: Record<string, string>;
+  onDisk: Record<string, string | undefined>;
+  plan: UpgradePlan;
+  policy?: Partial<UpgradeApplyPolicy>;
+}): Record<string, string>;
