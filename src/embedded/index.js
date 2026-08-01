@@ -22,9 +22,10 @@ import { deepMerge, toJson } from '../core/render.js';
 import { validateRelativePath, validatePathMap } from './paths.js';
 import { analyzePkgFragments } from './pkg-merge.js';
 import { deriveDeploymentContract } from './contract.js';
+import { planUpgrade, isUpgradeEmpty, buildUpgradeWrite, DEFAULT_UPGRADE_POLICY, summarizeUpgrade } from './upgrade.js';
 
 export { deriveDeploymentContract };
-export { planUpgrade, isUpgradeEmpty, buildUpgradeWrite, DEFAULT_UPGRADE_POLICY } from './upgrade.js';
+export { planUpgrade, isUpgradeEmpty, buildUpgradeWrite, DEFAULT_UPGRADE_POLICY, summarizeUpgrade };
 
 // Bumped when the shape of PackkitProjectDefinition changes incompatibly.
 export const SCHEMA_VERSION = 2;
@@ -341,6 +342,68 @@ export function createProjectFromDefinition(definition, { driftPolicy = 'report'
     : base;
   result.diagnostics.push(...drift);
   return result;
+}
+
+/**
+ * High-level upgrade orchestration for a host application. Takes a stored
+ * definition and the current repository files, regenerates with this Packkit
+ * version, and returns a classified plan plus a write patch — entirely in
+ * memory. Writes nothing, runs no git/commands, makes no network calls. The
+ * host decides whether to write the patch, commit it, or open a pull request.
+ *
+ * @param {object} input
+ * @param {object} input.definition  a PackkitProjectDefinition (from exportProjectDefinition)
+ * @param {Record<string,string>} input.currentFiles  the repo's current file contents
+ * @param {object} [input.currentPackageJson]  the current package.json, if not in currentFiles
+ * @param {object} [input.policy]  UpgradeApplyPolicy (default: non-destructive add-only)
+ */
+export function upgradeProject(input = {}) {
+  const { definition, currentFiles, currentPackageJson, policy } = input;
+  if (!currentFiles || typeof currentFiles !== 'object') {
+    throw new TypeError('upgradeProject needs currentFiles: a { path: contents } map of the repository.');
+  }
+
+  // Recreate with the current Packkit version (validates the definition and
+  // preserves extension add/replace semantics).
+  const generatedProject = createProjectFromDefinition(definition);
+
+  // Compare only the paths Packkit generates against what the repo has there.
+  const onDisk = {};
+  for (const path of Object.keys(generatedProject.files)) onDisk[path] = currentFiles[path];
+  if (onDisk['package.json'] === undefined && currentPackageJson && typeof currentPackageJson === 'object') {
+    onDisk['package.json'] = JSON.stringify(currentPackageJson);
+  }
+
+  const plan = planUpgrade({ generated: generatedProject.files, onDisk });
+  const patch = buildUpgradeWrite({ generated: generatedProject.files, onDisk, plan, policy });
+  const summary = summarizeUpgrade(plan);
+
+  // Baseline metadata (three-way diff) isn't stored yet, so changed values can't
+  // be classified as user-vs-template — surface that so a host doesn't assume a
+  // differing value is safe.
+  const baselineAvailable = false;
+  const diagnostics = [
+    {
+      severity: 'warning',
+      code: 'UPGRADE_BASELINE_UNAVAILABLE',
+      message: 'This project has no baseline metadata; values that differ are preserved and need manual review.',
+      source: 'upgrade',
+    },
+  ];
+
+  return {
+    generatedProject,
+    plan,
+    patch,
+    diagnostics,
+    metadata: {
+      fromPackkitVersion: definition?.packkitVersion,
+      toPackkitVersion: generatedProject.metadata.packkitVersion,
+      baselineAvailable,
+      hasConflicts: summary.conflicts > 0,
+      hasSafeChanges: summary.safeChanges > 0,
+    },
+  };
 }
 
 /**
