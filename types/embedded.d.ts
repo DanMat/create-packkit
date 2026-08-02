@@ -98,7 +98,18 @@ export function deriveDeploymentContract(config: ResolvedPackkitConfig): Deploym
 
 export type DependencySection = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
 
-export interface DependencyChange {
+/** Three-way classification of a value that differs from the current template. */
+export type ChangeStatus = 'changed' | 'template-only-change' | 'user-only-change' | 'both-changed';
+
+export interface ChangeClassification {
+  /** Present on *changed* items; 'changed' when there's no baseline to compare. */
+  status?: ChangeStatus;
+  /** True for a template-only change (the user hadn't edited it). */
+  safeToApply?: boolean;
+  reason?: string;
+}
+
+export interface DependencyChange extends ChangeClassification {
   /** Absent when the dependency is newly added. */
   current?: string;
   generated: string;
@@ -107,7 +118,7 @@ export interface DependencyChange {
 /** Dependency changes keyed by section, then package name — never by name alone. */
 export type DependencyChangeMap = Record<DependencySection, Record<string, DependencyChange>>;
 
-export interface PackageFieldChange {
+export interface PackageFieldChange extends ChangeClassification {
   field: string;
   current?: unknown;
   generated: unknown;
@@ -115,16 +126,33 @@ export interface PackageFieldChange {
 
 export interface PackageUpgradePlan {
   addedScripts: Record<string, string>;
-  changedScripts: Record<string, { current: string; generated: string }>;
+  changedScripts: Record<string, { current: string; generated: string } & ChangeClassification>;
   addedDependencies: DependencyChangeMap;
   changedDependencies: DependencyChangeMap;
   addedFields: PackageFieldChange[];
   changedFields: PackageFieldChange[];
 }
 
+export type FileUpgradeStatus =
+  | 'new-generated-file'
+  | 'unchanged'
+  | 'changed'
+  | 'template-only-change'
+  | 'user-only-change'
+  | 'both-changed';
+
 export interface UpgradePlan {
-  files: { added: string[]; changed: string[]; unchanged: string[] };
+  files: {
+    added: string[];
+    changed: string[];
+    unchanged: string[];
+    /** Classification of each changed file (three-way when a baseline exists). */
+    entries: Record<string, ChangeClassification>;
+  };
   packageJson: PackageUpgradePlan;
+  /** True when the project's packkit.json carried a baseline to compare against. */
+  baselineAvailable: boolean;
+  diagnostics: Diagnostic[];
   provenanceOutdated: boolean;
 }
 

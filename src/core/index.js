@@ -7,7 +7,7 @@ import { deepMerge, toJson } from './render.js';
 import { finalizePackageJson } from './pkg.js';
 import features from './features/index.js';
 import { buildMonorepo } from './monorepo.js';
-import { provenance } from './provenance.js';
+import { provenance, buildBaseline } from './provenance.js';
 import { PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset } from './presets.js';
 
 export { OPTIONS, GROUPS, OPTION_HELP, defaultConfig, normalizeConfig, PRESETS, PRESET_NAMES, PRESET_INFO, PRESET_ALIASES, resolvePreset };
@@ -66,7 +66,8 @@ export function generateTracked(input, diagnostics = null) {
 
   const { files, fileSources, fragments, pkg } = assemble(cfg);
   files['package.json'] = toJson(finalizePackageJson(pkg));
-  files['packkit.json'] = provenance(cfg);
+  // Baseline covers every file generated so far (all but packkit.json itself).
+  files['packkit.json'] = provenance(cfg, buildBaseline(files));
 
   return {
     config: cfg,

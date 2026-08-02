@@ -378,28 +378,17 @@ export function upgradeProject(input = {}) {
   const patch = buildUpgradeWrite({ generated: generatedProject.files, onDisk, plan, policy });
   const summary = summarizeUpgrade(plan);
 
-  // Baseline metadata (three-way diff) isn't stored yet, so changed values can't
-  // be classified as user-vs-template — surface that so a host doesn't assume a
-  // differing value is safe.
-  const baselineAvailable = false;
-  const diagnostics = [
-    {
-      severity: 'warning',
-      code: 'UPGRADE_BASELINE_UNAVAILABLE',
-      message: 'This project has no baseline metadata; values that differ are preserved and need manual review.',
-      source: 'upgrade',
-    },
-  ];
-
   return {
     generatedProject,
     plan,
     patch,
-    diagnostics,
+    // The plan is the single source of upgrade diagnostics (baseline
+    // availability, malformed package.json) — the CLI reads the same list.
+    diagnostics: plan.diagnostics,
     metadata: {
       fromPackkitVersion: definition?.packkitVersion,
       toPackkitVersion: generatedProject.metadata.packkitVersion,
-      baselineAvailable,
+      baselineAvailable: plan.baselineAvailable,
       hasConflicts: summary.conflicts > 0,
       hasSafeChanges: summary.safeChanges > 0,
     },

@@ -1,34 +1,31 @@
 // Upgrade planning.
 //
-// A project scaffolded by Packkit records what it came from in packkit.json.
-// That lets us regenerate the *current* recommended output and compare it to
-// what's on disk — so a project can be told what has drifted from Packkit's
-// current templates and choose what to pull in.
+// A project scaffolded by Packkit records what it came from in packkit.json —
+// the settings, and (since the baseline was added) a hash of every generated
+// file plus the package.json scripts/deps/fields at scaffold time. That lets an
+// upgrade do a three-way comparison:
 //
-// This module is pure: it takes two file maps (freshly generated vs. on disk)
-// and returns a classified plan. Reading the disk and applying the plan live in
-// the CLI; keeping the decision logic here makes it testable and reusable.
+//   baseline (what Packkit generated)  vs  current (on disk)  vs  new (regenerated)
 //
-// Safety model: without a stored baseline Packkit cannot know whether an
-// existing value differs because the template moved or because the user
-// customized it. So the default is conservative everywhere — additions apply,
-// but anything that already exists and differs is preserved, and only replaced
-// when the caller asks explicitly (per category).
+//   current == baseline, new != baseline  → template-only change → safe to apply
+//   current != baseline, new == baseline  → user-only edit       → preserve
+//   current != baseline, new != baseline  → both changed         → conflict, review
+//
+// Without a baseline (older projects) it falls back to the conservative model:
+// anything that differs is preserved and needs manual review.
+//
+// This module is pure: it takes file maps and returns a classified plan.
 
 import { finalizePackageJson } from '../core/pkg.js';
 import { deepMerge, toJson } from '../core/render.js';
+import { contentHash } from '../core/hash.js';
 
-// Files Packkit owns but that get structural, not whole-file, treatment.
-// package.json is co-owned (the host adds its own deps/scripts); packkit.json
-// is expected to change every version (it records the generator version).
 const STRUCTURAL = new Set(['package.json', 'packkit.json']);
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
-// Protected package.json fields — changing one can alter how the package is
-// built, published, or resolved, so a differing value is never overwritten by
-// default.
 const PROTECTED_FIELDS = ['exports', 'bin', 'main', 'module', 'types', 'files', 'engines', 'packageManager'];
 
-/** The conservative default: add what's new, preserve everything that differs. */
+/** The conservative default: add what's new (and safe template-only changes),
+ *  preserve everything a user may have edited. */
 export const DEFAULT_UPGRADE_POLICY = Object.freeze({
   files: 'add-only',
   scripts: 'add-only',
@@ -37,66 +34,87 @@ export const DEFAULT_UPGRADE_POLICY = Object.freeze({
 });
 
 const emptyDepMap = () => ({ dependencies: {}, devDependencies: {}, peerDependencies: {}, optionalDependencies: {} });
+const APPLY_MODES = new Set(['add-only', 'replace-changed']);
+
+// Validate a caller-supplied apply policy, so a typo ({ scripts: 'replace' })
+// fails loudly instead of silently behaving like add-only.
+function resolvePolicy(policy) {
+  const p = { ...DEFAULT_UPGRADE_POLICY };
+  for (const [category, mode] of Object.entries(policy || {})) {
+    if (!(category in DEFAULT_UPGRADE_POLICY)) throw new TypeError(`Unknown upgrade policy category "${category}".`);
+    if (!APPLY_MODES.has(mode)) throw new TypeError(`Invalid upgrade policy for "${category}": "${mode}" (expected 'add-only' or 'replace-changed').`);
+    p[category] = mode;
+  }
+  return p;
+}
+
+// Classify a value that is known to differ between current and generated, given
+// the baseline value (or none). Equality is by the caller's comparator.
+function classify(hasBaseline, baseline, currentEqBaseline, generatedEqBaseline) {
+  if (!hasBaseline) return { status: 'changed', safeToApply: false, reason: 'differs from the current template (no baseline to compare)' };
+  if (currentEqBaseline && !generatedEqBaseline) return { status: 'template-only-change', safeToApply: true, reason: 'the template changed and you had not edited this' };
+  if (!currentEqBaseline && generatedEqBaseline) return { status: 'user-only-change', safeToApply: false, reason: 'you edited this; the template did not change' };
+  return { status: 'both-changed', safeToApply: false, reason: 'both you and the template changed this' };
+}
 
 /**
  * Classify how a freshly-generated project differs from what's on disk.
+ * The baseline is read from the on-disk packkit.json (when present).
  *
  * @param {object} input
- * @param {Record<string,string>} input.generated  the current createProject().files
- * @param {Record<string,string|undefined>} input.onDisk  the on-disk content for
- *   each generated path (undefined when the file doesn't exist)
- * @returns an upgrade plan: which files are new/changed/current, and the
- *   structural package.json delta (scripts, dependencies per section, and
- *   protected fields, split into added vs changed).
+ * @param {Record<string,string>} input.generated  current createProject().files
+ * @param {Record<string,string|undefined>} input.onDisk  on-disk content per generated path
  */
 export function planUpgrade({ generated, onDisk }) {
+  const baseline = readBaseline(onDisk['packkit.json']);
+  const hasBaseline = !!baseline;
+
   const added = [];
   const changed = [];
   const unchanged = [];
+  const entries = {};
 
   for (const [path, content] of Object.entries(generated)) {
     if (STRUCTURAL.has(path)) continue;
     const disk = onDisk[path];
-    if (disk === undefined) added.push(path);
-    else if (disk === content) unchanged.push(path);
-    else changed.push(path);
+    if (disk === undefined) {
+      added.push(path);
+      continue;
+    }
+    if (disk === content) {
+      unchanged.push(path);
+      continue;
+    }
+    changed.push(path);
+    const baseHash = baseline?.files?.[path]?.hash;
+    const c = classify(hasBaseline && baseHash != null, baseHash, contentHash(disk) === baseHash, contentHash(content) === baseHash);
+    entries[path] = c;
+  }
+
+  const diagnostics = [];
+  if (!hasBaseline) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'UPGRADE_BASELINE_UNAVAILABLE',
+      message: 'This project has no baseline metadata; values that differ are preserved and need manual review.',
+      source: 'upgrade',
+    });
+  }
+  // Surface an unparseable package.json — the diff silently skips it, which
+  // could otherwise read as "no package changes".
+  if (onDisk['package.json'] !== undefined && !parseable(onDisk['package.json'])) {
+    diagnostics.push({ severity: 'error', code: 'PACKAGE_JSON_PARSE_FAILED', message: 'The current package.json could not be parsed; package changes were not planned.', source: 'upgrade' });
   }
 
   return {
-    files: {
-      added: added.sort(),
-      // "changed" means differs — could be a Packkit template change or the
-      // user's own edit. Without a stored baseline we can't tell which, so these
-      // are surfaced for review, never overwritten automatically.
-      changed: changed.sort(),
-      unchanged: unchanged.sort(),
-    },
-    packageJson: diffPackageJson(onDisk['package.json'], generated['package.json']),
-    // packkit.json records the generator version, so it always "changes" on an
-    // upgrade; applying the upgrade refreshes it.
+    files: { added: added.sort(), changed: changed.sort(), unchanged: unchanged.sort(), entries },
+    packageJson: diffPackageJson(onDisk['package.json'], generated['package.json'], baseline),
+    baselineAvailable: hasBaseline,
+    diagnostics,
+    // packkit.json records the generator version + baseline, so it always
+    // "changes" on an upgrade; applying the upgrade refreshes it.
     provenanceOutdated: onDisk['packkit.json'] !== generated['packkit.json'],
   };
-}
-
-/**
- * Count a plan into safe (additive, applied by default), review (differs,
- * preserved by default), and conflict (both-changed; only detectable with a
- * baseline, so 0 today). Used for the metadata summary and --json output.
- */
-export function summarizeUpgrade(plan) {
-  const p = plan.packageJson;
-  const depCount = (m) => DEP_SECTIONS.reduce((n, s) => n + Object.keys(m[s]).length, 0);
-  const safeChanges =
-    plan.files.added.length +
-    Object.keys(p.addedScripts).length +
-    depCount(p.addedDependencies) +
-    p.addedFields.length;
-  const reviewChanges =
-    plan.files.changed.length +
-    Object.keys(p.changedScripts).length +
-    depCount(p.changedDependencies) +
-    p.changedFields.length;
-  return { safeChanges, reviewChanges, conflicts: 0 };
 }
 
 /** True when a plan found nothing to bring in. */
@@ -117,21 +135,42 @@ export function isUpgradeEmpty(plan) {
 }
 
 /**
+ * Count a plan into safe (additive + template-only, applied by default), review
+ * (user edits and unclassified diffs, preserved), and conflicts (both-changed).
+ */
+export function summarizeUpgrade(plan) {
+  const p = plan.packageJson;
+  let safeChanges = plan.files.added.length + Object.keys(p.addedScripts).length + depCount(p.addedDependencies) + p.addedFields.length;
+  let reviewChanges = 0;
+  let conflicts = 0;
+
+  const tally = (entry) => {
+    if (entry.safeToApply) safeChanges++;
+    else if (entry.status === 'both-changed') { conflicts++; reviewChanges++; }
+    else reviewChanges++;
+  };
+  for (const path of plan.files.changed) tally(plan.files.entries[path]);
+  for (const c of Object.values(p.changedScripts)) tally(c);
+  for (const section of DEP_SECTIONS) for (const c of Object.values(p.changedDependencies[section])) tally(c);
+  for (const c of p.changedFields) tally(c);
+
+  return { safeChanges, reviewChanges, conflicts };
+}
+
+/**
  * Build the { path: content } map to write for a plan, under an apply policy.
- *
- * @param {object} input
- * @param {Record<string,string>} input.generated
- * @param {Record<string,string|undefined>} input.onDisk
- * @param {object} input.plan  a planUpgrade() result
- * @param {object} [input.policy]  per-category 'add-only' | 'replace-changed';
- *   defaults to DEFAULT_UPGRADE_POLICY (add-only everywhere — never destructive).
+ * Under 'add-only' (default), additions and *template-only* changes apply —
+ * both are safe (the user hadn't edited them). 'replace-changed' also applies
+ * user-edited and both-changed values.
  */
 export function buildUpgradeWrite({ generated, onDisk, plan, policy } = {}) {
-  const p = { ...DEFAULT_UPGRADE_POLICY, ...(policy || {}) };
+  const p = resolvePolicy(policy);
   const out = {};
 
   for (const path of plan.files.added) out[path] = generated[path];
-  if (p.files === 'replace-changed') for (const path of plan.files.changed) out[path] = generated[path];
+  for (const path of plan.files.changed) {
+    if (p.files === 'replace-changed' || plan.files.entries[path].safeToApply) out[path] = generated[path];
+  }
 
   if (onDisk['package.json'] && generated['package.json']) {
     const merged = mergePackageJson(onDisk['package.json'], generated['package.json'], plan.packageJson, p);
@@ -141,9 +180,8 @@ export function buildUpgradeWrite({ generated, onDisk, plan, policy } = {}) {
   return out;
 }
 
-// Apply the package.json changes the policy permits: always add what's new,
-// replace an existing differing value only under 'replace-changed'. Returns the
-// serialized package.json, or null when nothing would change.
+const willApply = (mode, entry) => mode === 'replace-changed' || entry.safeToApply;
+
 function mergePackageJson(diskStr, genStr, pkgPlan, policy) {
   let disk;
   let gen;
@@ -158,43 +196,33 @@ function mergePackageJson(diskStr, genStr, pkgPlan, policy) {
   const patch = {};
 
   for (const section of DEP_SECTIONS) {
-    for (const name of Object.keys(pkgPlan.addedDependencies[section])) {
-      (patch[section] ||= {})[name] = gen[section][name];
-      touched = true;
-    }
-    if (policy.dependencies === 'replace-changed') {
-      for (const name of Object.keys(pkgPlan.changedDependencies[section])) {
-        (patch[section] ||= {})[name] = gen[section][name];
-        touched = true;
-      }
+    for (const name of Object.keys(pkgPlan.addedDependencies[section])) { (patch[section] ||= {})[name] = gen[section][name]; touched = true; }
+    for (const [name, change] of Object.entries(pkgPlan.changedDependencies[section])) {
+      if (willApply(policy.dependencies, change)) { (patch[section] ||= {})[name] = gen[section][name]; touched = true; }
     }
   }
 
   const scripts = {};
   for (const name of Object.keys(pkgPlan.addedScripts)) { scripts[name] = gen.scripts[name]; touched = true; }
-  if (policy.scripts === 'replace-changed') {
-    for (const name of Object.keys(pkgPlan.changedScripts)) { scripts[name] = gen.scripts[name]; touched = true; }
+  for (const [name, change] of Object.entries(pkgPlan.changedScripts)) {
+    if (willApply(policy.scripts, change)) { scripts[name] = gen.scripts[name]; touched = true; }
   }
   if (Object.keys(scripts).length) patch.scripts = scripts;
 
   let merged = deepMerge(disk, patch);
-
-  // Protected fields are assigned whole (a merge could leave a stale nested key
-  // on a replaced exports/bin map). Added fields always land; changed ones only
-  // under 'replace-changed'.
+  // Protected fields are assigned whole (a merge could leave a stale nested key).
   for (const { field } of pkgPlan.addedFields) { merged = { ...merged, [field]: gen[field] }; touched = true; }
-  if (policy.packageFields === 'replace-changed') {
-    for (const { field } of pkgPlan.changedFields) { merged = { ...merged, [field]: gen[field] }; touched = true; }
+  for (const change of pkgPlan.changedFields) {
+    if (willApply(policy.packageFields, change)) { merged = { ...merged, [change.field]: gen[change.field] }; touched = true; }
   }
 
   if (!touched) return null;
   return toJson(finalizePackageJson(merged));
 }
 
-// Structural package.json diff: scripts, dependencies (per section), and
-// protected fields — each split into added (not on disk) vs changed (present
-// but different). The user's own extras are never reported as removed.
-function diffPackageJson(diskStr, genStr) {
+// Structural package.json diff, three-way-classified against the baseline
+// snapshot when present.
+function diffPackageJson(diskStr, genStr, baseline) {
   const empty = {
     addedScripts: {},
     changedScripts: {},
@@ -211,16 +239,23 @@ function diffPackageJson(diskStr, genStr) {
     disk = JSON.parse(diskStr);
     gen = JSON.parse(genStr);
   } catch {
-    return empty; // a hand-broken package.json — leave it alone
+    return empty;
   }
+
+  const base = baseline?.packageJson;
+  const hasBase = !!base;
 
   const addedDependencies = emptyDepMap();
   const changedDependencies = emptyDepMap();
   for (const section of DEP_SECTIONS) {
     for (const [name, version] of Object.entries(gen[section] || {})) {
       const current = disk[section]?.[name];
-      if (current === undefined) addedDependencies[section][name] = { generated: version };
-      else if (current !== version) changedDependencies[section][name] = { current, generated: version };
+      if (current === undefined) {
+        addedDependencies[section][name] = { generated: version };
+      } else if (current !== version) {
+        const b = base?.dependencies?.[section]?.[name];
+        changedDependencies[section][name] = { current, generated: version, ...classify(hasBase && b !== undefined, b, current === b, version === b) };
+      }
     }
   }
 
@@ -229,18 +264,54 @@ function diffPackageJson(diskStr, genStr) {
   for (const [name, cmd] of Object.entries(gen.scripts || {})) {
     const current = disk.scripts?.[name];
     if (current === undefined) addedScripts[name] = cmd;
-    else if (current !== cmd) changedScripts[name] = { current, generated: cmd };
+    else if (current !== cmd) {
+      const b = base?.scripts?.[name];
+      changedScripts[name] = { current, generated: cmd, ...classify(hasBase && b !== undefined, b, current === b, cmd === b) };
+    }
   }
 
   const addedFields = [];
   const changedFields = [];
   for (const field of PROTECTED_FIELDS) {
     if (!(field in gen)) continue;
-    if (!(field in disk)) addedFields.push({ field, generated: gen[field] });
-    else if (JSON.stringify(disk[field]) !== JSON.stringify(gen[field])) {
-      changedFields.push({ field, current: disk[field], generated: gen[field] });
+    if (!(field in disk)) {
+      addedFields.push({ field, generated: gen[field] });
+    } else if (JSON.stringify(disk[field]) !== JSON.stringify(gen[field])) {
+      const b = base?.protectedFields?.[field];
+      const bStr = JSON.stringify(b);
+      changedFields.push({
+        field,
+        current: disk[field],
+        generated: gen[field],
+        ...classify(hasBase && b !== undefined, b, JSON.stringify(disk[field]) === bStr, JSON.stringify(gen[field]) === bStr),
+      });
     }
   }
 
   return { addedScripts, changedScripts, addedDependencies, changedDependencies, addedFields, changedFields };
+}
+
+function depCount(map) {
+  return DEP_SECTIONS.reduce((n, s) => n + Object.keys(map[s]).length, 0);
+}
+
+function parseable(str) {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Read the baseline out of an on-disk packkit.json string. Returns null when
+// absent or unreadable (older projects), which drives the conservative fallback.
+function readBaseline(packkitJsonStr) {
+  if (!packkitJsonStr) return null;
+  try {
+    const b = JSON.parse(packkitJsonStr).baseline;
+    return b && typeof b === 'object' && b.files ? b : null;
+  } catch {
+    return null;
+  }
 }
