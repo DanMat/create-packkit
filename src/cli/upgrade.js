@@ -59,21 +59,27 @@ export async function runUpgrade(argv) {
   });
   if (values.help) return void console.log(UPGRADE_HELP);
 
+  // A fatal exit that honors --json: in JSON mode stdout gets one error
+  // document (nothing on stderr); otherwise a plain message on stderr. Sets a
+  // non-zero exit code without calling process.exit() (keeps the command
+  // testable and embeddable).
+  const fail = (code, message, extra = {}) => {
+    if (values.json) console.log(JSON.stringify({ schemaVersion: JSON_SCHEMA_VERSION, ok: false, error: { code, message, ...extra }, diagnostics: [] }, null, 2));
+    else console.error(message);
+    process.exitCode = 1;
+  };
+
   const dir = resolve(positionals[0] || '.');
   const provPath = join(dir, 'packkit.json');
   if (!existsSync(provPath)) {
-    const msg = `No packkit.json in "${dir}". Upgrade only works on a project Packkit scaffolded.`;
-    if (values.json) { console.log(JSON.stringify({ schemaVersion: JSON_SCHEMA_VERSION, error: msg }, null, 2)); return; }
-    console.error(msg);
-    process.exit(1);
+    return fail('PACKKIT_PROVENANCE_NOT_FOUND', `No packkit.json in "${dir}". Upgrade only works on a project Packkit scaffolded.`, { path: provPath });
   }
 
   let provenance;
   try {
     provenance = JSON.parse(readFileSync(provPath, 'utf8'));
   } catch (err) {
-    console.error(`Could not read packkit.json: ${err.message}`);
-    process.exit(1);
+    return fail('PACKKIT_PROVENANCE_INVALID', `Could not read packkit.json: ${err.message}`, { path: provPath });
   }
 
   // The project name isn't a "setting", so it lives in package.json, not
@@ -85,8 +91,7 @@ export async function runUpgrade(argv) {
   try {
     project = createProject({ preset: provenance.preset, name, config: provenance.settings || {} });
   } catch (err) {
-    console.error(`Could not regenerate from packkit.json: ${err.message}`);
-    process.exit(1);
+    return fail('PACKKIT_REGENERATION_FAILED', `Could not regenerate from packkit.json: ${err.message}`);
   }
   const toVersion = project.metadata.packkitVersion;
 
@@ -98,9 +103,12 @@ export async function runUpgrade(argv) {
 
   const plan = planUpgrade({ generated: project.files, onDisk });
 
-  // Machine-readable mode: emit only JSON, never a human log line.
+  // Machine-readable mode: emit only JSON, never a human log line. A fatal
+  // diagnostic (e.g. an unparseable package.json) sets a non-zero exit code.
   if (values.json) {
-    console.log(JSON.stringify(jsonReport(plan, fromVersion, toVersion), null, 2));
+    const out = jsonReport(plan, fromVersion, toVersion);
+    console.log(JSON.stringify(out, null, 2));
+    if (!out.ok) process.exitCode = 1;
     return;
   }
 

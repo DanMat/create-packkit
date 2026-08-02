@@ -359,8 +359,19 @@ export function createProjectFromDefinition(definition, { driftPolicy = 'report'
  */
 export function upgradeProject(input = {}) {
   const { definition, currentFiles, currentPackageJson, policy } = input;
-  if (!currentFiles || typeof currentFiles !== 'object') {
-    throw new TypeError('upgradeProject needs currentFiles: a { path: contents } map of the repository.');
+  // currentFiles must be a plain { path: string } map — not an array, and not
+  // carrying non-string values or unsafe paths. It's never written, so no
+  // containment check is needed, but malformed input should fail predictably.
+  if (!currentFiles || typeof currentFiles !== 'object' || Array.isArray(currentFiles)) {
+    throw new TypeError('upgradeProject needs currentFiles: a plain { path: contents } map of the repository.');
+  }
+  for (const [path, contents] of Object.entries(currentFiles)) {
+    if (typeof contents !== 'string' && contents !== undefined) {
+      throw new TypeError(`currentFiles["${path}"] must be a string (or undefined); got ${typeof contents}.`);
+    }
+    if (!validateRelativePath(path).ok) {
+      throw new TypeError(`currentFiles has an unsafe path: ${JSON.stringify(path)}.`);
+    }
   }
 
   // Recreate with the current Packkit version (validates the definition and

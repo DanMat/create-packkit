@@ -53,13 +53,7 @@ Planned and considered features for Packkit. Not commitments — a backlog to pu
 ### Layering (from the 3.0 approval review)
 _3.0 turned the embedded API into Packkit's public programmatic surface. Keeping the layers distinct is now an explicit design rule, not an accident of the current code._
 
-**Architecture principles** — now written down in [ARCHITECTURE.md](ARCHITECTURE.md) (shipped 3.1):
-1. The core never performs side effects.
-2. The embedded API is the only supported programmatic surface.
-3. The CLI is implemented on top of the embedded API.
-4. The web configurator is implemented on top of the embedded API (its bundled core).
-5. MCP is implemented on top of the embedded API.
-6. Future providers (Netlify, AWS, …) never bypass the embedded API.
+**Architecture principles** — the authoritative, corrected version lives in [ARCHITECTURE.md](ARCHITECTURE.md). In short: the **core** is a supported low-level browser-safe generation API; the **embedded API** is the recommended Node orchestration surface (diagnostics, definitions, deployment contract, upgrade planning); the **writer** is the safe filesystem adapter. The **CLI** uses the embedded API plus local side effects; the **web configurator** uses the core directly; **MCP** uses the embedded API where it needs orchestration and core/scaffold helpers otherwise. Path safety applies through the writer, and diagnostics through the embedded API — not to raw core calls. Provider-specific logic always lives in the host.
 
 - [x] ~~**CLI on the embedded API**~~ — **Shipped (3.1).** The CLI resolves + generates through `resolveProjectConfig` / `createProjectFromResolvedConfig` and writes through `writeGeneratedProject`, so every surface shares one pipeline (diagnostics, collision handling, path safety). Side effects (git, install, remote) stay in the CLI adapter. Behavior verified identical — exact file parity, merge/abort/remote/install all preserved — and the CLI now surfaces coercion warnings it used to swallow. The six layering principles are written down in [ARCHITECTURE.md](ARCHITECTURE.md).
 
