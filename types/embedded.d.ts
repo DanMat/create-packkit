@@ -132,6 +132,26 @@ export function createProjectFromDefinition(
 export function calculateProjectDigest(project: GeneratedProject): string;
 export function deriveDeploymentContract(config: ResolvedPackkitConfig): DeploymentContract;
 
+/** Whether a project fully matches the Packkit version it was last upgraded to.
+ *  `partial` means an upgrade applied some changes but left others unresolved
+ *  (preserved user edits / conflicts); `current` means nothing was left. */
+export type UpgradeStatus = 'current' | 'partial' | 'conflicted';
+
+/** The upgrade-tracking fields Packkit writes into `packkit.json`. All are
+ *  additive and optional, so pre-existing packkit.json files stay valid. */
+export interface UpgradeProvenance {
+  /** The version the project was originally scaffolded with. An upgrade never
+   *  changes this — it is historical provenance, not the current state. */
+  version?: string;
+  /** The Packkit version used to compute the most recent upgrade plan. */
+  lastUpgradeCheckedWith?: string;
+  /** The Packkit version whose patch was most recently applied. */
+  lastUpgradeAppliedWith?: string;
+  upgradeStatus?: UpgradeStatus;
+  /** Count of changes an upgrade left unresolved; omitted when fully current. */
+  unresolvedChanges?: number;
+}
+
 export type DependencySection = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
 
 /** Three-way classification of a value that differs from the current template. */

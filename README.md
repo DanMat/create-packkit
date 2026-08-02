@@ -104,6 +104,13 @@ Older projects without a baseline fall back to the conservative rule: anything
 that differs is preserved for review. `--json` reports the classification and
 `baselineAvailable` for automation.
 
+**Honest provenance.** After an upgrade, `packkit.json` records what actually
+happened rather than claiming the project is a fresh scaffold of the new
+version. `version` (the version you generated with) is left untouched;
+`lastUpgradeAppliedWith` records the version applied, and `upgradeStatus` is
+`current` only when nothing was left behind — a partial upgrade that preserved
+your edits is marked `partial` with an `unresolvedChanges` count.
+
 ## Or configure it on the web
 
 No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx create-packkit` command). Everything runs in your browser.
