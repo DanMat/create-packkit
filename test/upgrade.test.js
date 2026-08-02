@@ -105,13 +105,34 @@ test('default apply: adds new, preserves every differing value', () => {
 
   assert.equal(write['new.txt'], 'fresh', 'new file added');
   assert.equal(write['edited.txt'], undefined, 'changed file preserved (not written)');
-  assert.equal(write['packkit.json'], generated['packkit.json'], 'provenance refreshed');
+
+  // Provenance is refreshed to the new baseline but NOT claimed fully current:
+  // changes were preserved, so it is marked partial and generatedWith is unchanged.
+  const prov = JSON.parse(write['packkit.json']);
+  assert.equal(prov.version, '3.0.0', 'generatedWith unchanged by a partial upgrade');
+  assert.equal(prov.lastUpgradeAppliedWith, '3.2.0', 'records the version applied');
+  assert.equal(prov.lastUpgradeCheckedWith, '3.2.0', 'records the version checked');
+  assert.equal(prov.upgradeStatus, 'partial', 'unresolved changes → partial');
+  assert.ok(prov.unresolvedChanges > 0, 'counts what was left unresolved');
 
   const merged = JSON.parse(write['package.json']);
   assert.equal(merged.scripts.test, 'vitest', 'new script added');
   assert.equal(merged.scripts.build, 'custom-company-build', 'changed script PRESERVED');
   assert.equal(merged.scripts.mine, 'x', 'user script preserved');
   assert.equal(merged.devDependencies.typescript, '5.8.0', 'changed dep version PRESERVED');
+});
+
+test('full apply (replace-changed everywhere) marks provenance current', () => {
+  const { generated, onDisk, plan } = scenario();
+  const write = buildUpgradeWrite({
+    generated, onDisk, plan,
+    policy: { files: 'replace-changed', scripts: 'replace-changed', dependencies: 'replace-changed', packageFields: 'replace-changed' },
+  });
+
+  const prov = JSON.parse(write['packkit.json']);
+  assert.equal(prov.upgradeStatus, 'current', 'nothing left unresolved → current');
+  assert.equal(prov.unresolvedChanges, undefined, 'no count when fully current');
+  assert.equal(prov.lastUpgradeAppliedWith, '3.2.0', 'records the version applied');
 });
 
 test('explicit policy replaces changed scripts / deps only when asked', () => {

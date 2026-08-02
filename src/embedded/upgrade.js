@@ -176,7 +176,12 @@ export function buildUpgradeWrite({ generated, onDisk, plan, policy } = {}) {
     const merged = mergePackageJson(onDisk['package.json'], generated['package.json'], plan.packageJson, p);
     if (merged !== null) out['package.json'] = merged;
   }
-  if (plan.provenanceOutdated && generated['packkit.json']) out['packkit.json'] = generated['packkit.json'];
+  // Refresh packkit.json honestly: new baseline, but marked partial (with a
+  // count) when the policy leaves changes unresolved — never implying the
+  // project fully matches the new version when it doesn't.
+  if (plan.provenanceOutdated && generated['packkit.json']) {
+    out['packkit.json'] = upgradedProvenance(onDisk['packkit.json'], generated['packkit.json'], countUnresolved(plan, p));
+  }
   return out;
 }
 
@@ -218,6 +223,45 @@ function mergePackageJson(diskStr, genStr, pkgPlan, policy) {
 
   if (!touched) return null;
   return toJson(finalizePackageJson(merged));
+}
+
+// How many changed items the policy leaves unresolved (preserved, not applied).
+function countUnresolved(plan, policy) {
+  let n = 0;
+  for (const path of plan.files.changed) if (!willApply(policy.files, plan.files.entries[path])) n++;
+  for (const c of Object.values(plan.packageJson.changedScripts)) if (!willApply(policy.scripts, c)) n++;
+  for (const section of DEP_SECTIONS) for (const c of Object.values(plan.packageJson.changedDependencies[section])) if (!willApply(policy.dependencies, c)) n++;
+  for (const c of plan.packageJson.changedFields) if (!willApply(policy.packageFields, c)) n++;
+  return n;
+}
+
+// Build the packkit.json to write after an upgrade. Its baseline moves to the
+// current-version generated state (so preserved user edits are correctly seen
+// as customizations next time), but it does NOT claim the project was generated
+// with the new version — `version` (generatedWith) stays original, and upgrade
+// tracking fields record what actually happened. A partial upgrade is marked as
+// such rather than looking fully current.
+function upgradedProvenance(diskStr, genStr, unresolved) {
+  let disk = {};
+  let gen;
+  try {
+    gen = JSON.parse(genStr);
+    if (diskStr) disk = JSON.parse(diskStr);
+  } catch {
+    return genStr; // can't reason about it — fall back to the regenerated file
+  }
+  const toVersion = gen.version;
+  const out = {
+    ...gen,
+    version: disk.version || gen.version, // generatedWith: unchanged by an upgrade
+  };
+  if (toVersion) {
+    out.lastUpgradeCheckedWith = toVersion;
+    out.lastUpgradeAppliedWith = toVersion;
+  }
+  out.upgradeStatus = unresolved > 0 ? 'partial' : 'current';
+  if (unresolved > 0) out.unresolvedChanges = unresolved;
+  return toJson(out);
 }
 
 // Structural package.json diff, three-way-classified against the baseline
