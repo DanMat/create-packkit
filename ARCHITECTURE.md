@@ -5,65 +5,73 @@ that separation only holds if the layers stay distinct, so they're written down
 here as rules rather than left as an accident of the current code.
 
 ```
-          ┌── CLI ──┐  ┌─ web configurator ─┐  ┌─ MCP ─┐  ┌─ host apps ─┐
-          │  (bin)  │  │   (docs, bundled)  │  │ (mcp) │  │  (embedded) │
-          └────┬────┘  └──────────┬─────────┘  └───┬───┘  └──────┬──────┘
-               │                  │                │            │
-               └──────────────────┴────── adapters ┴────────────┘
-                                          │
-                              ┌───────────▼───────────┐
-                              │     Embedded API      │  src/embedded
-                              │  resolve · generate · │
-                              │   extend · write      │
-                              └───────────┬───────────┘
-                                          │
-                              ┌───────────▼───────────┐
-                              │        Core           │  src/core
-                              │  config → { files }   │
-                              │   pure, no side       │
-                              │   effects, browser-   │
-                              │   safe                │
-                              └───────────────────────┘
+   ┌── CLI ──┐   ┌─ web configurator ─┐   ┌─ MCP ─┐   ┌─ host apps ─┐
+   │  (bin)  │   │   (docs, bundled)  │   │ (mcp) │   │  (embedded) │
+   └────┬────┘   └──────────┬─────────┘   └───┬───┘   └──────┬──────┘
+        │ embedded          │ core            │ core +       │ embedded
+        │ + side effects    │ directly        │ scaffold     │
+        │                   │                 │              │
+   ┌────▼─────────────┐     │            ┌────▼────┐    ┌─────▼────────┐
+   │  Embedded API    │◄────┼────────────┤ (mixed) │    │  Embedded    │
+   │   src/embedded   │     │            └─────────┘    │              │
+   │ orchestration,   │     │                                          │
+   │ diagnostics,     │  ┌──▼───────────────────────────────────────┐  │
+   │ definitions,     │  │                 Core                      │◄─┘
+   │ upgrade, writer  ├─►│   src/core — config → { files }, pure,    │
+   └──────────────────┘  │   no side effects, browser-safe          │
+                         └──────────────────────────────────────────┘
 ```
+
+## Public surfaces (what's supported)
+
+| Import | What it is |
+| --- | --- |
+| `create-packkit` | Everything below, re-exported (Node). |
+| `create-packkit/core` | The **low-level, browser-safe** generation API (`generate`, `fromPreset`, `normalizeConfig`, `OPTIONS`, …). Supported. |
+| `create-packkit/embedded` | The **recommended Node orchestration API**: `createProject`, `extendProject`, definitions, digest, `deriveDeploymentContract`, the upgrade planner. Typed, versioned. |
+| `create-packkit/writer` | The **safe filesystem adapter** (`writeGeneratedProject`). |
+
+Anything under `src/**` not exported through those paths is internal and may
+change without a major bump. Host applications should not import undocumented
+internal modules.
 
 ## Principles
 
-1. **The core never performs side effects.** `src/core` is a pure
-   `config → { files }` function. It runs in Node and the browser, makes no
-   network calls, touches no filesystem, and spawns no processes. Everything it
-   returns is data.
+1. **The core never performs side effects and is browser-safe.** `src/core` is a
+   pure `config → { files }` function — no network, filesystem, processes, or
+   `node:crypto`. Everything it returns is data. It is a supported surface (the
+   web configurator and MCP use it directly).
 
-2. **The embedded API is the only supported programmatic surface.** `src/embedded`
-   is what other code builds on: `resolveProjectConfig`, `createProject`,
-   `extendProject`, `writeGeneratedProject`, and the definition/digest/contract
-   helpers. It's typed (`types/`) and versioned. Reaching past it into
-   `src/core/**` internals is unsupported and may break without a major bump.
+2. **The embedded API is the recommended programmatic surface.** It builds on the
+   core and adds what raw generation doesn't: normalization diagnostics, the
+   deployment contract, project definitions/digests, and upgrade planning. A host
+   app should prefer it. But it is not the *only* supported surface — `/core` and
+   `/writer` are supported too.
 
-3. **The CLI is an adapter over the embedded API.** `bin`/`src/cli` resolves and
-   generates through the embedded pipeline, then adds the side effects the
-   embedded API deliberately never performs — `git init`, dependency install,
-   creating the remote. It does not generate files by itself.
+3. **Path safety lives in the writer, not everywhere.** Filesystem path
+   validation and symlink/traversal protection apply when you write through
+   `create-packkit/writer` (which the embedded API and CLI use). Raw `core`
+   output is just data; a consumer that writes it itself is responsible for its
+   own path handling.
 
-4. **The web configurator is an adapter over the core.** `docs/` bundles
-   `src/core` directly (`build:web`) and runs it client-side to preview and zip a
-   project. Same generation, no server.
+4. **Diagnostics live in the embedded API, not the core.** `createProject`
+   surfaces normalization coercions, collisions, and (for upgrades) baseline
+   classification. A raw `core.generate()` call does not produce them — it just
+   returns files.
 
-5. **MCP is an adapter over the core + scaffold helpers.** `mcp/` exposes
-   generation as Model Context Protocol tools, importing `create-packkit/core`
-   and `create-packkit/scaffold`.
+5. **The CLI is an adapter over the embedded API plus local side effects.** It
+   resolves, generates, and writes through the embedded pipeline (so it shares
+   its diagnostics and path safety), then adds what the embedded API never does:
+   `git init`, install, creating the remote.
 
-6. **Future providers never bypass the embedded API.** Any deployment or
-   provisioning integration (Netlify, AWS, a portal) consumes the embedded API
-   like any other host. Provider-specific logic lives in the host, never in
-   Packkit — which is why the deployment contract is provider-neutral.
+6. **The web configurator uses the core directly.** `docs/` bundles `src/core`
+   (`build:web`) and runs it client-side to preview and zip. No embedded layer,
+   no server — which is why the core must stay browser-safe.
 
-## Why this matters
+7. **MCP uses the embedded API where it needs orchestration, and lower-level
+   `core`/`scaffold` helpers where intentionally required.**
 
-Because every surface resolves and generates through one pipeline, they all
-share the same normalization diagnostics, collision handling, and path safety.
-A fix to any of those benefits the CLI, the web page, MCP, and embedding hosts
-at once — and no surface can quietly diverge into its own behavior.
-
-The only thing that legitimately differs between surfaces is what they do
-*around* generation: the CLI installs and pushes, the web page zips, a host app
-deploys. Those are adapters. The engine in the middle is shared.
+8. **Future providers never bypass the embedded API.** Any deployment or
+   provisioning integration (Netlify, AWS, a portal) consumes it like any other
+   host. Provider-specific logic lives in the host, never in Packkit — which is
+   why the deployment contract is provider-neutral.

@@ -211,3 +211,17 @@ test('summarizeUpgrade counts additive vs review changes', () => {
   assert.equal(s.reviewChanges, 1); // b.txt changed
   assert.equal(s.conflicts, 0);
 });
+
+test('upgradeProject: rejects malformed currentFiles', () => {
+  const def = exportProjectDefinition(createProject({ preset: 'ts-lib', name: 'lib' }));
+  assert.throws(() => upgradeProject({ definition: def, currentFiles: ['a', 'b'] }), /plain/);
+  assert.throws(() => upgradeProject({ definition: def, currentFiles: { 'a.txt': 123 } }), /must be a string/);
+  assert.throws(() => upgradeProject({ definition: def, currentFiles: { '../evil': 'x' } }), /unsafe path/);
+});
+
+test('buildUpgradeWrite: rejects an invalid policy', () => {
+  const generated = { 'a.txt': 'A' };
+  const plan = planUpgrade({ generated, onDisk: {} });
+  assert.throws(() => buildUpgradeWrite({ generated, onDisk: {}, plan, policy: { scripts: 'replace' } }), /Invalid upgrade policy/);
+  assert.throws(() => buildUpgradeWrite({ generated, onDisk: {}, plan, policy: { bogus: 'add-only' } }), /Unknown upgrade policy/);
+});
