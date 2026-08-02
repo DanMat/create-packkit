@@ -22,17 +22,53 @@ export interface GeneratedProjectMetadata {
   extension?: Record<string, unknown>;
 }
 
-export type DeploymentType = 'static' | 'node-service' | 'library' | 'cli';
+export type DeploymentType = 'static' | 'node-service' | 'library' | 'cli' | 'fullstack';
 
-export interface DeploymentContract {
-  type: DeploymentType;
-  buildCommand?: string;
-  outputDirectory?: string;
-  startCommand?: string;
-  port?: number;
-  healthCheckPath?: string;
-  requiredEnvironmentVariables?: string[];
+export interface StaticDeploymentContract {
+  type: 'static';
+  buildCommand: string;
+  outputDirectory: string;
 }
+
+export interface NodeServiceDeploymentContract {
+  type: 'node-service';
+  runtime: 'node';
+  buildCommand?: string;
+  startCommand: string;
+  /** The port the server binds to with no configuration. */
+  defaultPort: number;
+  /** The env var that overrides the port (so PORT is optional, not required). */
+  portEnvironmentVariable: string;
+  healthCheckPath: string;
+  containerFile?: string;
+  requiredEnvironmentVariables: string[];
+  optionalEnvironmentVariables: string[];
+}
+
+export interface CliDeploymentContract {
+  type: 'cli';
+  buildCommand?: string;
+}
+
+export interface LibraryDeploymentContract {
+  type: 'library';
+  buildCommand?: string;
+}
+
+/** Front end and back end exposed separately — the host may deploy them together
+ *  (the server serves the web build) or apart. */
+export interface FullstackDeploymentContract {
+  type: 'fullstack';
+  frontend: StaticDeploymentContract;
+  backend: NodeServiceDeploymentContract;
+}
+
+export type DeploymentContract =
+  | StaticDeploymentContract
+  | NodeServiceDeploymentContract
+  | CliDeploymentContract
+  | LibraryDeploymentContract
+  | FullstackDeploymentContract;
 
 export interface GeneratedProject {
   config: ResolvedPackkitConfig;

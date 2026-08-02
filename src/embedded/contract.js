@@ -8,59 +8,69 @@
 
 /**
  * Derive the deployment contract from a resolved config.
- * @returns {import('./index.js').DeploymentContract}
+ * @returns {import('../../types/embedded.js').DeploymentContract}
  */
 export function deriveDeploymentContract(cfg) {
   const run = (script) => (cfg.packageManager === 'npm' ? `npm run ${script}` : `${cfg.packageManager} ${script}`);
   const start = cfg.packageManager === 'npm' ? 'npm start' : `${cfg.packageManager} start`;
-  // Read the structured resolved view rather than re-interpreting raw selections.
   const { targets, build } = cfg.resolved;
 
+  // Full-stack is a composite: a static front end plus a node service, exposed
+  // separately so the host can deploy them together (the server serves the web
+  // build) or apart. Checked first — its top-level target is `library`, so it
+  // would otherwise fall through to the library branch.
+  if (cfg.monorepo && cfg.monorepoLayout === 'fullstack') {
+    return {
+      type: 'fullstack',
+      frontend: staticContract(run, 'apps/web/dist'),
+      // The fullstack server serves /api/health and has no Dockerfile of its own.
+      backend: nodeServiceContract(run('build'), start, '/api/health', undefined),
+    };
+  }
+
   if (targets.service) {
-    // The generated server reads PORT but defaults to 3000, so PORT is optional,
-    // not required — `port` communicates the default and the `PORT` env var
-    // overrides it. `healthCheckPath` is only asserted because every service
-    // framework Packkit generates (Hono/Fastify/Express) defines /health.
-    return prune({
-      type: 'node-service',
-      buildCommand: build.has ? run('build') : undefined,
-      startCommand: start,
-      port: 3000,
-      healthCheckPath: '/health',
-      requiredEnvironmentVariables: [],
-    });
+    // The generated server reads PORT but defaults to 3000, and every framework
+    // Packkit generates (Hono/Fastify/Express) implements /health. The service
+    // preset also emits a Dockerfile.
+    return nodeServiceContract(build.has ? run('build') : undefined, start, '/health', 'Dockerfile');
   }
 
-  if (targets.app) {
-    return prune({
-      type: 'static',
-      buildCommand: run('build'),
-      // Vite's default build output.
-      outputDirectory: 'dist',
-    });
-  }
+  if (targets.app) return staticContract(run, 'dist');
 
-  if (targets.cli) {
-    return prune({
-      type: 'cli',
-      buildCommand: build.has ? run('build') : undefined,
-    });
-  }
+  if (targets.cli) return prune({ type: 'cli', buildCommand: build.has ? run('build') : undefined });
 
+  return prune({ type: 'library', buildCommand: build.has ? run('build') : undefined });
+}
+
+function staticContract(run, outputDirectory) {
+  return { type: 'static', buildCommand: run('build'), outputDirectory };
+}
+
+function nodeServiceContract(buildCommand, startCommand, healthCheckPath, containerFile) {
+  // defaultPort/portEnvironmentVariable make the port semantics explicit: the
+  // service binds to 3000 by default and honors PORT — so PORT is optional, not
+  // required. requiredEnvironmentVariables is kept even when empty as an explicit
+  // "nothing else is required" signal for a provisioning host.
   return prune({
-    type: 'library',
-    buildCommand: build.has ? run('build') : undefined,
+    type: 'node-service',
+    runtime: 'node',
+    buildCommand,
+    startCommand,
+    defaultPort: 3000,
+    portEnvironmentVariable: 'PORT',
+    healthCheckPath,
+    containerFile,
+    requiredEnvironmentVariables: [],
+    optionalEnvironmentVariables: ['PORT'],
   });
 }
 
-// Drop undefined fields and empty required-env arrays so the contract stays
-// minimal and deterministic — the same config always yields the same object.
+// Drop only undefined fields, so the shape stays deterministic while explicit
+// empty arrays (requiredEnvironmentVariables) are preserved as meaningful.
 function prune(contract) {
   const out = {};
   for (const [k, v] of Object.entries(contract)) {
-    if (v === undefined) continue;
-    if (k === 'requiredEnvironmentVariables' && Array.isArray(v) && v.length === 0) continue;
-    out[k] = v;
+    if (v !== undefined) out[k] = v;
   }
   return out;
 }
