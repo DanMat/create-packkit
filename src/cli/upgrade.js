@@ -150,26 +150,18 @@ export async function runUpgrade(argv) {
 function jsonReport(plan, fromVersion, toVersion) {
   const files = [
     ...plan.files.added.map((path) => ({ path, status: 'new-generated-file', safeToApply: true })),
-    ...plan.files.changed.map((path) => ({ path, status: 'changed', safeToApply: false })),
+    ...plan.files.changed.map((path) => ({ path, ...plan.files.entries[path] })),
   ];
   return {
     schemaVersion: JSON_SCHEMA_VERSION,
+    ok: !plan.diagnostics.some((d) => d.severity === 'error'),
     fromPackkitVersion: fromVersion,
     toPackkitVersion: toVersion,
-    // Baseline (three-way) metadata isn't stored yet, so changed values can't be
-    // classified as user-vs-template.
-    baselineAvailable: false,
+    baselineAvailable: plan.baselineAvailable,
     summary: summarizeUpgrade(plan),
     files,
     packageJson: plan.packageJson,
-    diagnostics: [
-      {
-        severity: 'warning',
-        code: 'UPGRADE_BASELINE_UNAVAILABLE',
-        message: 'This project has no baseline metadata; values that differ are preserved and need manual review.',
-        source: 'upgrade',
-      },
-    ],
+    diagnostics: plan.diagnostics,
   };
 }
 

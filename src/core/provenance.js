@@ -11,12 +11,24 @@
 
 import { toJson } from './render.js';
 import { defaultConfig } from './options.js';
+import { contentHash } from './hash.js';
 
 // How this particular run was invoked, rather than what the project is.
 // Replaying a config shouldn't re-run someone else's `git init` or install.
 const TRANSIENT = new Set(['gitInit', 'install', 'generatorVersion', 'preset', 'name']);
 
-export function provenance(cfg) {
+// Bumped if the baseline shape changes incompatibly.
+const BASELINE_SCHEMA_VERSION = 1;
+const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+const PROTECTED_FIELDS = ['exports', 'bin', 'main', 'module', 'types', 'files', 'engines', 'packageManager'];
+
+/**
+ * Serialize packkit.json: the settings that differ from the defaults, plus (when
+ * supplied) a baseline of what was generated — per-file hashes and the
+ * package.json scripts/deps/protected-fields at scaffold time — so a later
+ * `packkit upgrade` can tell a user's edit from a template change.
+ */
+export function provenance(cfg, baseline) {
   const defaults = defaultConfig();
   const settings = {};
   for (const [key, value] of Object.entries(cfg)) {
@@ -31,5 +43,35 @@ export function provenance(cfg) {
     ...(cfg.generatorVersion ? { version: cfg.generatorVersion } : {}),
     ...(cfg.preset ? { preset: cfg.preset } : {}),
     settings,
+    ...(baseline ? { baseline } : {}),
   });
+}
+
+/**
+ * Build the baseline from a fully-generated file map: a content hash for every
+ * file (except packkit.json, which holds the baseline), plus a structural
+ * snapshot of package.json. Deterministic — the same files always hash the same.
+ */
+export function buildBaseline(files) {
+  const fileHashes = {};
+  for (const path of Object.keys(files).sort()) {
+    if (path === 'packkit.json') continue;
+    fileHashes[path] = { hash: contentHash(files[path]) };
+  }
+
+  let packageJson = { scripts: {}, dependencies: {}, protectedFields: {} };
+  if (files['package.json']) {
+    try {
+      const pkg = JSON.parse(files['package.json']);
+      const dependencies = {};
+      for (const section of DEP_SECTIONS) if (pkg[section]) dependencies[section] = { ...pkg[section] };
+      const protectedFields = {};
+      for (const field of PROTECTED_FIELDS) if (field in pkg) protectedFields[field] = pkg[field];
+      packageJson = { scripts: { ...(pkg.scripts || {}) }, dependencies, protectedFields };
+    } catch {
+      /* leave the empty baseline */
+    }
+  }
+
+  return { schemaVersion: BASELINE_SCHEMA_VERSION, files: fileHashes, packageJson };
 }

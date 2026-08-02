@@ -2464,9 +2464,29 @@ var features_default = [
   gitfiles_default
 ];
 
+// src/core/hash.js
+function contentHash(str) {
+  let h1 = 3735928559;
+  let h2 = 1103547991;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
+  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
+  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  const n = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  return n.toString(16).padStart(14, "0");
+}
+
 // src/core/provenance.js
 var TRANSIENT = /* @__PURE__ */ new Set(["gitInit", "install", "generatorVersion", "preset", "name"]);
-function provenance(cfg) {
+var BASELINE_SCHEMA_VERSION = 1;
+var DEP_SECTIONS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+var PROTECTED_FIELDS = ["exports", "bin", "main", "module", "types", "files", "engines", "packageManager"];
+function provenance(cfg, baseline) {
   const defaults = defaultConfig();
   const settings = {};
   for (const [key, value] of Object.entries(cfg)) {
@@ -2478,8 +2498,29 @@ function provenance(cfg) {
     generator: "create-packkit",
     ...cfg.generatorVersion ? { version: cfg.generatorVersion } : {},
     ...cfg.preset ? { preset: cfg.preset } : {},
-    settings
+    settings,
+    ...baseline ? { baseline } : {}
   });
+}
+function buildBaseline(files) {
+  const fileHashes = {};
+  for (const path of Object.keys(files).sort()) {
+    if (path === "packkit.json") continue;
+    fileHashes[path] = { hash: contentHash(files[path]) };
+  }
+  let packageJson = { scripts: {}, dependencies: {}, protectedFields: {} };
+  if (files["package.json"]) {
+    try {
+      const pkg = JSON.parse(files["package.json"]);
+      const dependencies = {};
+      for (const section of DEP_SECTIONS) if (pkg[section]) dependencies[section] = { ...pkg[section] };
+      const protectedFields = {};
+      for (const field of PROTECTED_FIELDS) if (field in pkg) protectedFields[field] = pkg[field];
+      packageJson = { scripts: { ...pkg.scripts || {} }, dependencies, protectedFields };
+    } catch {
+    }
+  }
+  return { schemaVersion: BASELINE_SCHEMA_VERSION, files: fileHashes, packageJson };
 }
 
 // src/core/monorepo.js
@@ -2570,6 +2611,7 @@ function buildMonorepo(cfg) {
     test: exampleTest2(`import { shout } from './index.js';`, `expect(shout('world')).toBe('HELLO, WORLD!')`),
     deps: { [core]: wsProto }
   });
+  files["packkit.json"] = provenance(cfg, buildBaseline(files));
   return {
     config: cfg,
     files,
@@ -2793,6 +2835,7 @@ function buildFullstack(cfg) {
     `}`,
     ``
   ].join("\n");
+  files["packkit.json"] = provenance(cfg, buildBaseline(files));
   return {
     config: cfg,
     files,
@@ -3023,7 +3066,6 @@ function workspaceScaffold(cfg, { workspaceGlobs, tsconfigLib = ["ES2022"] }) {
   ].join("\n");
   files[".prettierrc.json"] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: "all" });
   files[".github/workflows/ci.yml"] = ciWorkflow2(cfg, cfg.packageManager);
-  files["packkit.json"] = provenance(cfg);
   return files;
 }
 function addPackage(files, { name, dir, src, test, deps: deps2 }) {
@@ -3274,7 +3316,7 @@ function generateTracked(input, diagnostics = null) {
   }
   const { files, fileSources, fragments, pkg } = assemble(cfg);
   files["package.json"] = toJson(finalizePackageJson(pkg));
-  files["packkit.json"] = provenance(cfg);
+  files["packkit.json"] = provenance(cfg, buildBaseline(files));
   return {
     config: cfg,
     files,

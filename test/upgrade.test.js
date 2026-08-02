@@ -35,11 +35,15 @@ test('package.json diff: added vs changed, split by dependency section', () => {
   // added lands in the right section
   assert.deepEqual(p.addedDependencies.devDependencies.vitest, { generated: '^4.0.0' });
   assert.deepEqual(p.addedDependencies.peerDependencies.react, { generated: '>=18' });
-  // changed carries current + generated
-  assert.deepEqual(p.changedDependencies.dependencies.hono, { current: '^4.0.0', generated: '^4.5.0' });
+  // changed carries current + generated (and, without a baseline, status 'changed')
+  assert.equal(p.changedDependencies.dependencies.hono.current, '^4.0.0');
+  assert.equal(p.changedDependencies.dependencies.hono.generated, '^4.5.0');
+  assert.equal(p.changedDependencies.dependencies.hono.status, 'changed');
+  assert.equal(p.changedDependencies.dependencies.hono.safeToApply, false);
   // scripts
   assert.equal(p.addedScripts.test, 'vitest');
-  assert.deepEqual(p.changedScripts.build, { current: 'my-custom-build', generated: 'tsup' });
+  assert.equal(p.changedScripts.build.current, 'my-custom-build');
+  assert.equal(p.changedScripts.build.generated, 'tsup');
   // the user's own dep/script are not reported as removed
   assert.equal(p.addedDependencies.dependencies['my-lib'], undefined);
   assert.equal(p.changedScripts.deploy, undefined);
@@ -49,8 +53,10 @@ test('same dependency name in different sections stays distinct', () => {
   const generated = { 'package.json': pkg({ dependencies: { react: '^19.0.0' }, peerDependencies: { react: '>=19' } }) };
   const onDisk = { 'package.json': pkg({ dependencies: { react: '^18.0.0' }, peerDependencies: { react: '>=18' } }) };
   const p = planUpgrade({ generated, onDisk }).packageJson;
-  assert.deepEqual(p.changedDependencies.dependencies.react, { current: '^18.0.0', generated: '^19.0.0' });
-  assert.deepEqual(p.changedDependencies.peerDependencies.react, { current: '>=18', generated: '>=19' });
+  assert.equal(p.changedDependencies.dependencies.react.current, '^18.0.0');
+  assert.equal(p.changedDependencies.dependencies.react.generated, '^19.0.0');
+  assert.equal(p.changedDependencies.peerDependencies.react.current, '>=18');
+  assert.equal(p.changedDependencies.peerDependencies.react.generated, '>=19');
 });
 
 test('protected package fields: added vs changed', () => {
@@ -157,9 +163,32 @@ test('upgradeProject: recreates, diffs, and builds a patch — purely in memory'
   assert.ok(result.generatedProject.files['package.json']);
   assert.equal(result.patch['.editorconfig'], project.files['.editorconfig'], 'missing file in the patch');
   assert.equal(result.patch['README.md'], undefined, 'edited file preserved (default policy)');
-  assert.equal(result.metadata.baselineAvailable, false);
-  assert.ok(result.diagnostics.some((d) => d.code === 'UPGRADE_BASELINE_UNAVAILABLE'));
+  // The project carries a baseline, so the edited README is classified as a
+  // user-only change (preserved), not just "differs".
+  assert.equal(result.metadata.baselineAvailable, true);
+  assert.equal(result.plan.files.entries['README.md'].status, 'user-only-change');
+  assert.ok(!result.diagnostics.some((d) => d.code === 'UPGRADE_BASELINE_UNAVAILABLE'));
   assert.equal(result.metadata.hasSafeChanges, true);
+});
+
+test('baseline three-way: template-only change is safe to apply; user edit is preserved', () => {
+  const project = createProject({ preset: 'ts-lib', name: 'lib' });
+  const definition = exportProjectDefinition(project);
+  const currentFiles = { ...project.files };
+  // user edited the README (user-only) — must be preserved
+  currentFiles['README.md'] = 'my edits\n';
+  // a file that matches the baseline but the "new template" changed → simulate
+  // by asking the plan directly with a generated file that differs while onDisk
+  // equals the baseline.
+  const generated = { 'x.ts': 'new template', 'packkit.json': project.files['packkit.json'] };
+  const onDisk = { 'x.ts': 'old template', 'packkit.json': project.files['packkit.json'] };
+  // no baseline entry for x.ts in this synthetic packkit.json → classified 'changed'
+  const p = planUpgrade({ generated, onDisk });
+  assert.equal(p.files.entries['x.ts'].status, 'changed'); // unknown without a baseline entry
+
+  // the real project: README is a user-only-change and is NOT in the default patch
+  const result = upgradeProject({ definition, currentFiles });
+  assert.equal(result.patch['README.md'], undefined);
 });
 
 test('upgradeProject: an up-to-date repo yields an empty patch', () => {

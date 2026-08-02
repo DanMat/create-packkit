@@ -6,7 +6,7 @@ import { toJson } from './render.js';
 import community from './features/community.js';
 import agents from './features/agents.js';
 import gitfiles from './features/gitfiles.js';
-import { provenance } from './provenance.js';
+import { provenance, buildBaseline } from './provenance.js';
 import { V } from './versions.js';
 
 export function buildMonorepo(cfg) {
@@ -110,6 +110,9 @@ export function buildMonorepo(cfg) {
     test: exampleTest(`import { shout } from './index.js';`, `expect(shout('world')).toBe('HELLO, WORLD!')`),
     deps: { [core]: wsProto },
   });
+
+  // Written last so the baseline covers every workspace file.
+  files['packkit.json'] = provenance(cfg, buildBaseline(files));
 
   return {
     config: cfg,
@@ -357,6 +360,9 @@ function buildFullstack(cfg) {
     ``,
   ].join('\n');
 
+  // Written last so the baseline covers every workspace file.
+  files['packkit.json'] = provenance(cfg, buildBaseline(files));
+
   return {
     config: cfg,
     files,
@@ -599,7 +605,8 @@ function workspaceScaffold(cfg, { workspaceGlobs, tsconfigLib = ['ES2022'] }) {
   ].join('\n');
   files['.prettierrc.json'] = toJson({ useTabs: true, singleQuote: true, semi: true, printWidth: 100, trailingComma: 'all' });
   files['.github/workflows/ci.yml'] = ciWorkflow(cfg, cfg.packageManager);
-  files['packkit.json'] = provenance(cfg);
+  // packkit.json is written by the caller, after every package exists, so its
+  // baseline covers the whole project.
   return files;
 }
 

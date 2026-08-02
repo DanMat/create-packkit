@@ -92,6 +92,18 @@ Your own files, scripts, and dependencies are never touched by `--apply`. The
 report lists everything preserved so you can review it and opt into replacement
 where you want Packkit's version.
 
+**Baseline-aware.** Since it records a baseline of what it generated (in
+`packkit.json`), upgrade can do a three-way comparison and tell the difference
+between a change *you* made and one the *template* made:
+
+- **template-only change** (you didn't edit it) → applied by `--apply`, safely;
+- **your edit** (the template didn't change) → preserved;
+- **both changed** → flagged as a conflict to review.
+
+Older projects without a baseline fall back to the conservative rule: anything
+that differs is preserved for review. `--json` reports the classification and
+`baselineAvailable` for automation.
+
 ## Or configure it on the web
 
 No install needed: **[danmat.github.io/create-packkit](https://danmat.github.io/create-packkit/)** — tick the options, preview the file tree, and **download a zip** (or copy the equivalent `npx create-packkit` command). Everything runs in your browser.
