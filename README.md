@@ -92,16 +92,20 @@ Your own files, scripts, and dependencies are never touched by `--apply`. The
 report lists everything preserved so you can review it and opt into replacement
 where you want Packkit's version.
 
-**Baseline-aware.** Since it records a baseline of what it generated (in
-`packkit.json`), upgrade can do a three-way comparison and tell the difference
-between a change *you* made and one the *template* made:
+**Baseline-aware (new projects).** Projects scaffolded with Packkit 3.3+ record
+a baseline of what was generated (in `packkit.json`), so upgrade can do a
+three-way comparison and tell the difference between a change *you* made and one
+the *template* made:
 
 - **template-only change** (you didn't edit it) → applied by `--apply`, safely;
 - **your edit** (the template didn't change) → preserved;
 - **both changed** → flagged as a conflict to review.
 
-Older projects without a baseline fall back to the conservative rule: anything
-that differs is preserved for review. `--json` reports the classification and
+**Older projects** without a baseline fall back to the conservative rule:
+anything that differs is preserved for review.
+
+Either way, `--apply` never overwrites your own edits or resolves conflicts for
+you — those are always preserved. `--json` reports the classification and
 `baselineAvailable` for automation.
 
 **Honest provenance.** After an upgrade, `packkit.json` records what actually
