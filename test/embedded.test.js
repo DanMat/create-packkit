@@ -159,8 +159,14 @@ test('calculateProjectDigest is stable across repeated generation', () => {
 test('deriveDeploymentContract: shape per target, provider-neutral', () => {
   const svc = createProject({ preset: 'node-service', name: 'svc' }).deploymentContract;
   assert.equal(svc.type, 'node-service');
-  assert.equal(svc.port, 3000);
+  assert.equal(svc.runtime, 'node');
+  assert.equal(svc.defaultPort, 3000);
+  assert.equal(svc.portEnvironmentVariable, 'PORT');
   assert.equal(svc.healthCheckPath, '/health');
+  assert.equal(svc.containerFile, 'Dockerfile');
+  assert.deepEqual(svc.requiredEnvironmentVariables, []);
+  assert.deepEqual(svc.optionalEnvironmentVariables, ['PORT']);
+  assert.equal(svc.port, undefined, 'ambiguous `port` replaced by defaultPort');
 
   const app = createProject({ preset: 'react-app', name: 'app' }).deploymentContract;
   assert.deepEqual(app, { type: 'static', buildCommand: 'npm run build', outputDirectory: 'dist' });
@@ -168,8 +174,17 @@ test('deriveDeploymentContract: shape per target, provider-neutral', () => {
   const lib = createProject({ preset: 'ts-lib', name: 'lib' }).deploymentContract;
   assert.equal(lib.type, 'library');
 
+  // Full-stack is a composite of a static front end + a node service.
+  const fs = createProject({ preset: 'fullstack', name: 'fs' }).deploymentContract;
+  assert.equal(fs.type, 'fullstack');
+  assert.deepEqual(fs.frontend, { type: 'static', buildCommand: 'pnpm build', outputDirectory: 'apps/web/dist' });
+  assert.equal(fs.backend.type, 'node-service');
+  assert.equal(fs.backend.healthCheckPath, '/api/health');
+  assert.equal(fs.backend.defaultPort, 3000);
+  assert.equal(fs.backend.containerFile, undefined, 'the fullstack server has no Dockerfile');
+
   // No provider-specific fields leak in.
-  const json = JSON.stringify([svc, app, lib]);
+  const json = JSON.stringify([svc, app, lib, fs]);
   assert.doesNotMatch(json, /vercel|netlify|aws|cloudflare|github/i);
 });
 
@@ -339,10 +354,11 @@ test('createProjectFromDefinition: rejects unsafe keys and oversized definitions
   );
 });
 
-test('deployment contract does not mark PORT required (it has a default)', () => {
+test('deployment contract makes PORT explicitly optional (it has a default)', () => {
   const svc = createProject({ preset: 'node-service', name: 'svc', overrides: { env: true } }).deploymentContract;
-  assert.equal(svc.requiredEnvironmentVariables, undefined, 'PORT has a default, so not required');
-  assert.equal(svc.port, 3000);
+  assert.deepEqual(svc.requiredEnvironmentVariables, [], 'nothing is required');
+  assert.deepEqual(svc.optionalEnvironmentVariables, ['PORT'], 'PORT is optional, overriding the default');
+  assert.equal(svc.defaultPort, 3000);
 });
 
 test('the public project has no leaked internal extension state', () => {
