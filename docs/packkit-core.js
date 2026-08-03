@@ -1,8 +1,8 @@
 // src/core/node-versions.js
 var NODE_LINES = {
-  "24": { version: "24.18.0", status: "active-lts", codename: "Krypton", label: '24 (Active LTS, "Krypton")' },
-  "22": { version: "22.23.1", status: "maintenance", codename: "Jod", label: '22 (Maintenance LTS, "Jod")' },
-  "26": { version: "26.5.0", status: "current", codename: null, label: "26 (Current)" }
+  "24": { version: "24.18.1", status: "active-lts", codename: "Krypton", label: '24 (Active LTS, "Krypton")' },
+  "22": { version: "22.23.2", status: "maintenance", codename: "Jod", label: '22 (Maintenance LTS, "Jod")' },
+  "26": { version: "26.5.1", status: "current", codename: null, label: "26 (Current)" }
 };
 var DEFAULT_NODE = "24";
 
