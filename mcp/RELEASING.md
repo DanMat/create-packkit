@@ -9,7 +9,7 @@ because several of these steps fail in non-obvious ways (see [Gotchas](#gotchas)
 | --- | --- | --- |
 | **npm** | `packkit-mcp` | `release.yml` — automatic |
 | **Official MCP registry** | `io.github.DanMat/packkit-mcp` | `release.yml` — automatic |
-| **Glama** | [`DanMat/create-packkit`](https://glama.ai/mcp/servers/DanMat/create-packkit) | Admin → Dockerfile → **Build & Release** — **manual** |
+| **Glama** | [`PackkitJS/create-packkit`](https://glama.ai/mcp/servers/PackkitJS/create-packkit) | Admin → Dockerfile → **Build & Release** — **manual** |
 | **mcpservers.org** | submitted once | — |
 | **awesome-mcp-servers** | README entry + Glama score badge | — |
 
@@ -124,7 +124,7 @@ and answers an introspection request — the tool schemas appear in *Instance lo
    `npm login` (or `npm logout && npm login`).
 6. **awesome-mcp-servers requires a *passing* Glama listing** plus the score badge
    in the entry:
-   `[![DanMat/create-packkit MCP server](https://glama.ai/mcp/servers/DanMat/create-packkit/badges/score.svg)](https://glama.ai/mcp/servers/DanMat/create-packkit)`
+   `[![PackkitJS/create-packkit MCP server](https://glama.ai/mcp/servers/PackkitJS/create-packkit/badges/score.svg)](https://glama.ai/mcp/servers/PackkitJS/create-packkit)`
 7. **`glama.json` only carries `maintainers`** — it's the ownership/claim hook.
    Everything else (name, description, build) is configured in Glama's admin panel
    after claiming.
