@@ -8,7 +8,7 @@ because several of these steps fail in non-obvious ways (see [Gotchas](#gotchas)
 | Surface | Identifier | Updated by |
 | --- | --- | --- |
 | **npm** | `packkit-mcp` | `release.yml` — automatic |
-| **Official MCP registry** | `io.github.DanMat/packkit-mcp` | `release.yml` — automatic |
+| **Official MCP registry** | `io.github.PackkitJS/packkit-mcp` | `release.yml` — automatic |
 | **Glama** | [`PackkitJS/create-packkit`](https://glama.ai/mcp/servers/PackkitJS/create-packkit) | Admin → Dockerfile → **Build & Release** — **manual** |
 | **mcpservers.org** | submitted once | — |
 | **awesome-mcp-servers** | README entry + Glama score badge | — |
@@ -109,9 +109,9 @@ and answers an introspection request — the tool schemas appear in *Instance lo
 
 ## Gotchas
 
-1. **The registry namespace is case-sensitive.** It's `io.github.DanMat`, matching
+1. **The registry namespace is case-sensitive.** It's `io.github.PackkitJS`, matching
    the GitHub username's capitalisation. Lowercase gives
-   `403 … You have permission to publish: io.github.DanMat/*`.
+   `403 … You have permission to publish: io.github.PackkitJS/*`.
 2. **`mcpName` proves npm ownership**, so it must match `server.json`'s `name`
    byte-for-byte. A published npm version can't be overwritten — if `mcpName` is
    wrong you must publish a *new* version with it corrected.
