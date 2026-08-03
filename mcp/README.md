@@ -1,6 +1,6 @@
 # packkit-mcp
 
-An [MCP](https://modelcontextprotocol.io) server for **[Packkit](https://github.com/DanMat/create-packkit)** — let AI agents (Claude Desktop, Cursor, Windsurf, …) scaffold modern npm packages, CLIs, HTTP services, and front-end apps as a native tool.
+An [MCP](https://modelcontextprotocol.io) server for **[Packkit](https://github.com/PackkitJS/create-packkit)** — let AI agents (Claude Desktop, Cursor, Windsurf, …) scaffold modern npm packages, CLIs, HTTP services, and front-end apps as a native tool.
 
 ## Tools
 
@@ -25,7 +25,7 @@ Add to your MCP client config (e.g. Claude Desktop's `claude_desktop_config.json
 
 Then ask your agent things like *"scaffold a React component library called ui with Storybook"* or *"preview a Hono service named api"*.
 
-Also listed on the [official MCP registry](https://registry.modelcontextprotocol.io) as `io.github.DanMat/packkit-mcp` and on [Glama](https://glama.ai/mcp/servers/DanMat/create-packkit).
+Also listed on the [official MCP registry](https://registry.modelcontextprotocol.io) as `io.github.DanMat/packkit-mcp` and on [Glama](https://glama.ai/mcp/servers/PackkitJS/create-packkit).
 
 ## Releasing
 
@@ -33,4 +33,4 @@ Publishing a new version touches npm, the official MCP registry and Glama — se
 
 ## License
 
-[MIT](https://github.com/DanMat/create-packkit/blob/main/LICENSE) © DanMat
+[MIT](https://github.com/PackkitJS/create-packkit/blob/main/LICENSE) © DanMat
