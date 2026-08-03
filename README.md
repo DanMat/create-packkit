@@ -1,6 +1,6 @@
 # Packkit 📦
 
-> A highly configurable scaffolder for modern **npm packages and CLIs** — pick your stack from a CLI **or** a web configurator, and get a ready-to-ship repo.
+> A highly configurable generator for modern **JS/TS projects** — packages, CLIs, apps, services, and full-stack repos — from a CLI **or** a web configurator, with a stable embedded API and safe upgrades.
 
 [![npm version](https://img.shields.io/npm/v/create-packkit?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/create-packkit)
 [![npm downloads](https://img.shields.io/npm/dm/create-packkit?style=flat-square&logo=npm&color=cb3837&label=downloads)](https://www.npmjs.com/package/create-packkit)
@@ -13,7 +13,7 @@
 [![llms.txt](https://img.shields.io/badge/llms.txt-✓-000000?style=flat-square)](https://packkitjs.github.io/create-packkit/llms.txt)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 
-Most scaffolders lock you into one stack, one language, and the terminal. Packkit lets you **choose** — TypeScript or JavaScript, library or CLI, ESM/CJS/dual, your bundler, test runner, linter, git hooks, release flow, GitHub Actions and more — and it works from a CLI **or** a browser page that downloads your project as a zip.
+Most scaffolders lock you into one stack, one language, and the terminal. Packkit lets you **choose** — TypeScript or JavaScript, library, CLI, app, service, or full-stack monorepo, ESM/CJS/dual, your bundler, test runner, linter, git hooks, release flow, GitHub Actions and more — and it works from a CLI **or** a browser page that downloads your project as a zip.
 
 ## Quick start
 
